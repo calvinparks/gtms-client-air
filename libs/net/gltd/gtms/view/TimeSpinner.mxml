@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8" width="50" height="25"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+		
+			[Bindable]
+			public var value:int;
+			
+			protected function afterSpinner_changeHandler(event:Event):void
+			{
+				dispatchEvent(new Event (Event.CHANGE));
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:BorderContainer width="63" height="25" backgroundAlpha="0.2" backgroundColor="0x696969" borderColor="0xffffff" borderAlpha=".2">
+		<s:Label text="{afterSpinner.value/1000}"  width="58" id="reconnectAfterDisplay" verticalCenter="1" left="6"/>
+		<s:Spinner id="afterSpinner" right="0" verticalCenter="0" change="afterSpinner_changeHandler(event)"
+				  value="@{value}"
+				
+				   minimum="5000"
+				   maximum="10000000"
+				   snapInterval="5000"/>
+		
+	</s:BorderContainer> 
+	<s:Label text="sec."/>
+</s:HGroup>

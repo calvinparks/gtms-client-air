@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:ns="net.gltd.gtms.view.IM.contacts_utils.*"
+		 xmlns:parsley="http://www.spicefactory.org/parsley"
+		 width="100%" left="0" right="0" maxHeight="1000000"
+		 autoDrawBackground="false"
+		 creationComplete="cc(event)"
+		 >
+		<!-- includeInLayout="{Boolean(_listData.length)}" visible="{Boolean(_listData.length)}"
+		 >-->
+	<fx:Declarations>
+		<fx:uint id="gNr" />
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.controller.app.ApplicationManager;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.GroupModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.view.im.ToolTipPanel;
+			import net.gltd.gtms.view.im.utils.ShowLed;
+			
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.vcard.VCardName;
+			
+			import spark.components.Label;
+			
+			[Bindable]
+			public 	var gModel:GroupModel;
+			
+			public var sortKey:int = 100;
+
+			public	static	const	LIST_NAME			:String			= "_contactItems";
+			private 		const	_customItemRenderer	:ClassFactory	= new ClassFactory(	net.gltd.gtms.view.im.contactList.BuddyItemRenderer );
+ 
+			
+			public override function set data(obj:Object):void {
+				super.data = data;
+				gModel = obj as GroupModel;
+				_list.itemRenderer = itemRenderer;
+				if (gModel != null)	sortKey = gModel.sortKey;
+				
+				
+				if (!_list.hasEventListener(ContactItemEvent.TOOL_TIP))_list.addEventListener(ContactItemEvent.TOOL_TIP,onTooltip,false,0,true);
+				
+				cc(null);
+				
+			}
+			private function onTooltip(event:ContactItemEvent):void {
+				
+				var ptt:ToolTipPanel = ApplicationManager.ToolTipWindow;
+				if (ptt.closed){
+					ptt.open(false)
+					ptt.visible = false;
+					return
+				}
+				if (event.mouseEvent.type != MouseEvent.ROLL_OVER || net.gltd.gtms.GUI.contextMenu.ContextMenu.isOpen){
+					ptt.visible = false;
+					return;
+				}
+				
+				var bd:BuddyModel = buddiesHolder.getInstance().getBuddy(event.id);
+				if (bd == null) {
+					return;
+				}
+				ptt.preInit();
+				ptt.title = bd.nickname;
+				
+				var info:String = "";
+				if (bd.avatar.bmpData)ptt.avatar = (bd.avatar.bmpData);
+				if (bd.hasOwnProperty("roster")){
+					ptt.title += " ("+ bd['roster'].jid.escaped.toString();
+					if (bd['roster'].jid.resource)ptt.title += "/"+bd['roster'].jid.resource;
+					ptt.title += ")";
+				}
+					//if(bd['roster']['status'])info +="Status: "+bd['roster'].status;
+				if(bd['vCard']){
+					if(bd['vCard'].name){
+						if ((bd['vCard'].name as VCardName).given)info += (bd['vCard'].name as VCardName).given+ " ";
+						if ((bd['vCard'].name as VCardName).middle)info += (bd['vCard'].name as VCardName).middle+ " ";
+						if ((bd['vCard'].name as VCardName).family)info += (bd['vCard'].name as VCardName).family;
+					
+					}else {
+						if (bd['vCard'].nickname != null && bd['vCard'].nickname.length > 0){
+							info += bd['vCard'].nickname;
+						}
+					}
+					if (info.length>0)info+="\n";
+					if(bd['vCard'].email)info +="E-mail: "+bd['vCard'].email+"\n\n";
+					if(bd['phones']){
+						for (var ph:String in bd['phones']){
+							info += bd['phones'][ph].label+": "+ bd['phones'][ph].phone+"\n"
+						}
+					}
+				}
+				if (bd.hasOwnProperty("roster")){
+					var s:String = bd['roster'].status;
+					var show:ShowLed = new ShowLed();
+					show.showLed = ShowStatusManager.getShowIco( bd['roster'] );
+					show._top = -3;
+					var sts:Label = new Label();
+					sts.styleName = "_contactItemStatus";
+					
+					sts.maxWidth = ptt.maxWidth - 37;
+					sts.text = s;
+					
+					ptt._bottomCont.addElement(show)
+					ptt._bottomCont.addElement(sts);
+					ptt.bodyText = info;
+				}
+				
+				
+				ptt.bodyText = info;
+				
+				ptt.init();
+				//event.toolTip.toolTip = ptt;
+				
+				ptt.move(
+					FlexGlobals.topLevelApplication.nativeWindow.x + event.mouseEvent.stageX + 30,
+					FlexGlobals.topLevelApplication.nativeWindow.y + event.mouseEvent.stageY + 30
+					) 
+				
+				ptt.activate();
+			}
+
+			protected function groupClick(event:MouseEvent):void
+			{	
+				try{
+					if (gModel.clickFunction!=null) gModel.clickFunction(event,gModel);
+					
+					if (event.type == MouseEvent.CLICK){
+						gModel.isClosed = !gModel.isClosed;
+						
+						this.setCurrentState(this.states[uint(gModel.isClosed)].name,true);
+						(_bt.skin)['_str'].rotation = uint(gModel.isClosed) * (-90);
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+			
+			}
+			
+			private function set itemRenderer(ir:ClassFactory):void {
+			}
+
+			[Bindable]
+			private function get itemRenderer():ClassFactory {
+				
+				if (gModel != null && gModel.itemRenderer != null) return gModel.itemRenderer;
+				return _customItemRenderer;
+			}
+	
+			 
+			
+			protected function cc(event:FlexEvent):void
+			{
+				try {
+					this.setCurrentState(this.states[uint(gModel.isClosed)].name,true);
+					(_bt.skin)['_str'].rotation = uint(gModel.isClosed) * (-90);
+				}catch (error:Error){}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>	
+		<s:State name="show" />
+		<s:State name="close" />
+	</s:states>
+	
+		<s:Button	id="_bt" name="_group" styleName="contactGropuTitle"
+					left="0" right="0" width="100%" 
+				 	label="{gModel.groupName + ' ('+gModel.itemCollection.length+')'}" 
+					click="groupClick(event)" rightClick="groupClick(event)"
+		 />
+		<s:List	id="_list"  doubleClickEnabled="true" 
+					skinClass="net.gltd.gtms.view.utils.NoScrollListSkin"
+					name="{LIST_NAME}"
+					top="30" bottom="0" width="100%"
+					labelField="nickname"
+					styleName="_contactsList"
+					dragEnabled="true" dragMoveEnabled="true" mouseEnabled="false"
+					includeInLayout.show="true"	includeInLayout.close="false"
+					visible.show="true"	visible.close="false"
+					focusOut="{_list.selectedIndex = -1}"
+					requireSelection = "false" arrowKeysWrapFocus="true"
+					dataProvider="{gModel.itemCollection}"
+					
+				>
+			<s:layout>
+				<s:VerticalLayout gap="1"  />
+				</s:layout>
+			</s:List>
+</s:ItemRenderer>

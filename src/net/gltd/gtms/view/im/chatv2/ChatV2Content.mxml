@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		 xmlns:view="net.gltd.gtms.view.*"
+		 xmlns:chatv2="net.gltd.gtms.view.im.chatv2.*" creationComplete="init(event)"  >
+	<fx:Declarations>
+		<s:DropShadowFilter angle="-90" color="#000000" blurX="0" blurY="2" id="ds" strength=".5" distance="1"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.UEM.UEM;
+			import net.gltd.gtms.GUI.window.CustomWindow;
+			import net.gltd.gtms.controller.Emoticons;
+			import net.gltd.gtms.controller.muc.MUCXMPPManager;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.contact.GroupModel;
+			import net.gltd.gtms.model.im.MessageModel;
+			import net.gltd.gtms.model.im.RoomModel;
+			import net.gltd.gtms.model.im.StreamMessagesModel;
+			import net.gltd.gtms.model.muc.StreamModel;
+			import net.gltd.gtms.utils.FilterArrayCollection;
+			import net.gltd.gtms.view.im.chat.InviteList;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.collections.ArrayCollection;
+			import mx.core.INavigatorContent;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.FlexMouseEvent;
+			import mx.managers.DragManager;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			
+			import spark.components.Button;
+			import spark.components.Group;
+			import spark.components.HGroup;
+			import spark.components.Image;
+			import spark.components.NavigatorContent;
+			import spark.components.Panel;
+			import spark.components.TextInput;
+			import spark.components.TileGroup;
+			import spark.components.TitleWindow;
+			import spark.components.Window;
+			import spark.events.IndexChangeEvent;
+			import spark.events.RendererExistenceEvent;
+			import spark.skins.spark.ButtonSkin;
+			
+			
+			private var _selectedChat:int = 0;
+			private var _selectedItemId:String;
+			private var _bottomBar:HGroup = new HGroup();
+			
+			[Bindable]
+			public var chatsCollection:FilterArrayCollection;
+			
+			public var source:FilterArrayCollection;
+			
+			public	var	defaultContent:Boolean = true;
+			
+			
+			
+			public function set selectedChat(nr:int):void {
+				if (nr<0)nr=0;
+				_selectedChat = nr;
+				select( nr );
+				try {
+					if (chatsCollection.getItemAt(nr) is RoomModel)(this.parentApplication as Window).title = "Chat in "+(chatsCollection.getItemAt(nr) as RoomModel).label;
+					else if (chatsCollection.getItemAt(nr) is StreamMessagesModel)(this.parentApplication as Window).title = "Stream: "+chatsCollection.getItemAt(nr).label;
+					else (this.parentApplication as Window).title = "Chat with "+chatsCollection.getItemAt(nr).label;
+				}catch (error:Error){
+					 trace (error.getStackTrace());
+				}
+			}
+			[Bindable]
+			public function get selectedChat():int {
+				return _selectedChat;
+			}
+			public function set selectedItemId(s:String):void {
+				try {
+					_selectedItemId = s;
+					 if (searchString.length > 0){ 
+						onSearch("");
+						setTimeout(function():void {
+							searchBar.srchStr.text = "";
+							selectedChat =  chatsCollection.getItemIndexByID(s);
+						},600);
+						return;
+					} 
+				selectedChat = chatsCollection.getItemIndexByID(s);
+				
+			
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+			} 
+			public function get selectedItemId():String {
+				try {
+					return _list.selectedItem.jid.bareJID;
+				}catch (error:Error){}
+				
+				return null;
+			}
+			
+			public function removeAll():void {
+				for (var i:uint = 0; i< _chats.length; i++){
+					_chats.getItemAt(i).onRemoved();
+				}
+				if (!defaultContent){
+					for (i = 0; i< chatsCollection.source[i]; i++){
+						chatsCollection.source[i].hasOwnWindow = false;
+					}
+						
+				}
+				_chats.removeAll();
+				chatsCollection.removeAll();
+				source.removeEventListener(CollectionEvent.COLLECTION_CHANGE,onSourceChange);
+				chatsCollection.removeEventListener(CollectionEvent.COLLECTION_CHANGE,onChatsChange);
+			}	
+			public function setChats(data:Array,sourceArrayColl:FilterArrayCollection):void {
+				this.chatsCollection = new FilterArrayCollection ();
+				chatsCollection.ignoreCaseSensitivity = true;
+				this.source = sourceArrayColl;
+				for (var i:uint = 0; i< data.length; i++){
+					if (defaultContent && data[i].hasOwnWindow)continue;
+					chatsCollection.addItem( data[i] );
+				}
+				source.addEventListener(CollectionEvent.COLLECTION_CHANGE,onSourceChange,false,0,true);
+				chatsCollection.addEventListener(CollectionEvent.COLLECTION_CHANGE,onChatsChange,false,0,true);
+				chatsCollection.filterFunction = sf;
+			}
+			private function onChatsChange(e:CollectionEvent):void {
+				if (e.kind == CollectionEventKind.ADD){	
+					addChat( e.items[0] );
+					return;
+				}
+				if (e.kind == CollectionEventKind.REMOVE){
+					if (!defaultContent)e.items[0].hasOwnWindow = false;
+					var id:String = e.items[0].id;
+					var ind:int = e.location;
+					var selected:Boolean = (ind == _selectedChat);
+					var chatViewIndex:int = getChatId( id );
+					try {
+						_chats.getItemAt(chatViewIndex)['onRemoved']();
+						_chats.removeElementAt( chatViewIndex );	
+					}catch (error:Error){
+					//	trace (error.getStackTrace());
+					}
+					
+					if (chatsCollection.length == 0) {
+						removeAll();
+						this.parentApplication.close();
+						return;
+					}
+				
+					var newListIndex:int;
+					if (_selectedChat > ind){ 
+						newListIndex = _selectedChat;
+						
+					} else if (_selectedChat < ind){
+						newListIndex =_selectedChat;
+					}else if (selected){
+						newListIndex = Math.max(0,ind-1)
+					}
+					selectedChat = newListIndex;
+				}
+			}
+			private function onSourceChange(e:CollectionEvent):void {
+				if (e.kind == CollectionEventKind.ADD){
+					if (e.items[0].windowid == this.id)chatsCollection.addItem( e.items[0] );
+				}
+			}
+			private function addChat(m:MessageModel):void {
+				try {
+					
+					if (defaultContent)m.hasOwnWindow = false;
+					else m.hasOwnWindow = true;
+					m.windowid = this.id;
+					
+					var it:NavigatorContent;
+					if (m.type == "room"){
+						var room:RoomNavigatorContent = new RoomNavigatorContent();
+						room.model = m as RoomModel;
+						
+						_chats.addElement( room );
+					}else if (m.type == StreamModel.KIND_STREAM){
+						var stream:StreamNavigatorContent = new StreamNavigatorContent();
+						stream.model = m as StreamMessagesModel;
+						_chats.addElement( stream );
+					}
+					else {
+						var chat:ChatNavigatorContent = new ChatNavigatorContent();
+						chat.model = m;
+						_chats.addElement( chat );
+					}
+					
+				}catch (error:Error){
+			// 		trace (error.getStackTrace());
+				}
+ 				//if (chatsCollection.length == 1)selectedChat = 0;
+				
+			}
+			protected function init(event:FlexEvent):void
+			{
+				_bottomBar.bottom = 8;
+				_bottomBar.right = 11;
+				try {
+				//	_bottomBar.right = BindingUtils.bindProperty(_bottomBar,"right", _chats.selectedChild,'rightMargin');
+				}catch (error:Error){
+					//_bottomBar.right = 11;
+				}
+				
+				
+				
+				var button:Button = new Button();
+				button.label = "Send";
+				button.right = 0;
+				button.addEventListener(MouseEvent.CLICK,onSend);
+				
+				_bottomBar.addElement(button);
+				
+				var icons:Button = new Button();
+				icons.setStyle("icon",Emoticons.getInstance().ico);
+				icons.styleName = "smallButton";
+				icons.right = 0;
+				icons.width = 31;
+				//styleName="smallButton" width="28" height="28" 
+				icons.addEventListener(MouseEvent.CLICK,selectIcon);
+				
+				_bottomBar.addElement(icons);
+				_bottomBar.addElement(button);
+				
+				this.parentApplication['addElement'](_bottomBar);
+				chatsCollection.refresh();
+				for (var i:uint = 0; i<chatsCollection.length;i++){
+					addChat( chatsCollection.getItemAt(i) as MessageModel ) ;
+				}
+				_list.addEventListener(ChatEvent.CHAT_CLOSED,onCloseTab,false,2);
+				_list.addEventListener(ChatEvent.SEPARATED_WINDOW,onSeparatedWindow,false,2);
+				_list.addEventListener(ChatEvent.MOVE_BACK,onMoveBack,false,2);
+				_list.addEventListener(ChatEvent.USER_INVITE,onInvite,false,2);
+				_list.addEventListener(ChatEvent.USER_CHANGE_SUBJECT,onChangeSubject,false,2);
+				try {	
+				//	(this.parentApplication as Window).title = "Chat with "+chatsCollection.getItemAt(selectedChat).label;
+					
+					if (chatsCollection.getItemAt(selectedChat) is RoomModel)(this.parentApplication as Window).title = "Chat in "+chatsCollection.getItemAt(selectedChat).label;
+					if (chatsCollection.getItemAt(selectedChat) is StreamMessagesModel)(this.parentApplication as Window).title = "Stream: "+chatsCollection.getItemAt(selectedChat).label;
+					else (this.parentApplication as Window).title = "Chat with "+chatsCollection.getItemAt(selectedChat).label;
+				}catch (error:Error){}
+			
+			}
+			private function onSeparatedWindow(event:ChatEvent):void {
+				removeItem(event.id);
+			}
+			private function onMoveBack(event:ChatEvent):void {
+				removeItem(event.id);
+			}
+			
+			
+			protected function initStack(event:FlexEvent):void
+			{ 
+				setTimeout(function():void {
+					select(selectedChat)
+					_list.selectedIndex = selectedChat;
+				},200);
+				
+				_chats.addEventListener(ChatEvent.USER_INVITE,onInvite,false,0,true);
+			}
+			
+			
+			
+			
+			private function onChangeSubject(event:ChatEvent):void {
+				MUCXMPPManager.onChangeSubject(event.room);
+				
+			}
+			private var _inviteWindow:CustomWindow;
+			private var _inviteList:InviteList;
+			
+			private function onInvite(event:ChatEvent):void {
+				if (_inviteWindow == null || _inviteWindow.closed){
+					_inviteWindow = new CustomWindow();
+					_inviteWindow.maximizable = false;
+					_inviteWindow.closeable = true;
+					_inviteWindow.minimizable = true;
+					_inviteWindow.resizable = true;
+				
+					_inviteWindow.title = "Invite People To Chat With: "
+					if (event.currentTarget is List)_inviteWindow.title+= event.roomName;
+					else _inviteWindow.title+=event.currentTarget.label;
+					_inviteWindow.width = 420;
+					_inviteWindow.height = 310;
+					_inviteWindow.open(true);
+					_inviteWindow.move(Screen.mainScreen.bounds.width/2 - _inviteWindow.width/2, Screen.mainScreen.bounds.height/2 - _inviteWindow.height/2 - 20);
+					_inviteWindow._container.bottom = 43;
+					
+					var saveButton:Button = new Button();
+					saveButton.label = " Create Group Chat ";
+					_inviteWindow.addElement(saveButton);
+					saveButton.bottom = 8;
+					saveButton.right = 10;
+					
+					saveButton.addEventListener(MouseEvent.CLICK,doInvite);
+					
+					_inviteList = new InviteList();
+					_inviteWindow._container.addElement(_inviteList);
+					
+					
+				}else {
+					
+				}
+				if (event.room){// || _chats.selectedChild is RoomNavigatorContent){
+					saveButton.label = "Invite";
+					var room:Room 
+					room = event.room;
+					//room = (_chats.selectedChild as RoomNavigatorContent).model.room;
+					
+					_inviteList.room = room;
+					_inviteList.occupants = [];
+					for (var i:uint = 0; i<room.length;i++){
+						_inviteList.occupants.push( (room.getItemAt(i) as RoomOccupant).jid.bareJID )
+					}
+				}else {
+					_inviteList.selectedIds = [event.id];
+				}
+				_inviteList.init();
+			}
+			protected function doInvite(event:MouseEvent):void {
+				if (_inviteList._list.selectedItems.length == 0)return;
+				var recipients:Array = [];
+				for (var i:uint = 0; i < _inviteList._list.selectedItems.length;i++){
+					recipients.push( _inviteList._list.selectedItems[i].jid )
+				}
+				
+				var chatEvent:ChatEvent = new ChatEvent(ChatEvent.OPEN_ROOM);
+				chatEvent.recipients = recipients;
+				chatEvent.room = _inviteList.room;
+				chatEvent.roomName = _inviteList._roomName.text;
+				chatEvent.inviteMessage = _inviteList._inviteMessage.text;
+				dispatchEvent(chatEvent);
+				
+				_inviteList.onRemove();
+				_inviteWindow.close();
+			}
+			
+			private function onCloseTab(event:ChatEvent):void {
+				try{
+					if (!defaultContent) chatsCollection.getItemByID( event.id ).removeFromSource();
+					if (source.getItemIndexByID(event.id) > -1)source.removeByID( event.id );
+					removeItem(event.id);
+					UEM.killFor(event.id,"_IMUEM");
+				}catch(error:Error){
+					trace (error.getStackTrace());
+				}
+			}
+			private function removeItem(id:String):void {
+				var ind:int = chatsCollection.getItemIndexByID( id );
+				chatsCollection.removeItemAt(ind);
+			}
+			
+			private function onSend(event:MouseEvent):void {
+				_chats.selectedChild['send']();
+			}
+			private function selectIco(name:String):Function {
+				return function(event:MouseEvent):void  {
+					for (var ind:String in Emoticons.getInstance().icons){
+						if (name ==  Emoticons.getInstance().icons[ind].name) {
+							_chats.selectedChild['setInputString'](ind);
+							onClose(null);
+							return;
+						}
+					}
+				}
+					
+			}
+			private var iconsPanel:TitleWindow;
+			private function selectIcon(event:MouseEvent):void {
+				if (iconsPanel == null){
+					iconsPanel = new TitleWindow();
+					
+					iconsPanel.setStyle("backgroundColor","#C9E1F6");
+					iconsPanel.setStyle("backgroundAlpha",".8")
+					iconsPanel.setStyle("chromeColor","#4D6C92" );
+		//
+					var tl:TileGroup = new TileGroup();
+					tl.paddingBottom = tl.paddingLeft = tl.paddingTop = tl.paddingTop = 8;
+					
+					for (var i:uint = 0; i < Emoticons.getInstance().incosList.length;i++){
+						var img:Image = new Image();
+						img.source =  Emoticons.getInstance().incosList[i].ico;
+						img.toolTip = Emoticons.getInstance().incosList[i].name;
+						img.addEventListener(MouseEvent.CLICK,selectIco(Emoticons.getInstance().incosList[i].name));
+						tl.addElement(img);
+					}
+					iconsPanel.title = "Emoticons";
+					
+					iconsPanel.addElement(tl);
+					iconsPanel.addEventListener(CloseEvent.CLOSE,onClose);
+					iconsPanel.addEventListener(FocusEvent.FOCUS_OUT,onKO)
+				//	(event.currentTarget as Button).
+					iconsPanel.width = 162;
+					iconsPanel.height = 156;
+					
+					this.parentApplication['addElement'](iconsPanel);
+				}else iconsPanel.visible = true;
+				
+				iconsPanel.x = event.stageX - iconsPanel.width;
+				iconsPanel.y = event.stageY - iconsPanel.height ;
+				iconsPanel.setFocus();
+				
+				
+			}
+			private function onKO(e:FocusEvent):void {
+				iconsPanel.visible = false;
+				//this.parentApplication['removeElement'](e.currentTarget as TitleWindow)
+			}
+			private function onClose(e:CloseEvent):void {
+				iconsPanel.visible = false;
+				var ob:Object;
+				try {
+					if ((_chats.selectedChild is StreamNavigatorContent) == false){
+						setTimeout(_chats.selectedChild['_outgoingMsgField'].setFocus , 100)
+					}
+				}catch(error:Error){
+					
+				}
+				//this.parentApplication['removeElement'](e.currentTarget as TitleWindow)
+			}
+			[Bindable]
+			private var _selectedViewIndex:int = -1;
+			private function select(ind:int):void {
+				try { 
+					
+					try {
+						if (_selectedViewIndex > -1) {
+							_chats.getItemAt(_selectedViewIndex).selected = false;
+						}
+					}catch (error:Error){
+						
+					}
+					
+					_selectedViewIndex = getChatId((chatsCollection.getItemAt(ind) as MessageModel).id);
+					_chats.selectedChild = _chats.getItemAt( _selectedViewIndex ) as INavigatorContent;
+					//_chats.selectedIndex = _selectedViewIndex;
+					_bottomBar.visible = !(_chats.selectedChild is StreamNavigatorContent);
+					_chats.selectedChild['selected'] = true; 
+					BindingUtils.bindProperty(_bottomBar,"right", _chats.selectedChild,'rightMargin');
+				
+				}catch (error:Error){
+				//	trace (error.getStackTrace())
+				}
+			} 
+			private function getChatId(id:String):int {
+				for (var i:uint = 0; i<_chats.length;i++){
+					if (_chats.getElementAt(i)['model'].id == id)return i;
+				}
+				return -1;
+			}
+			private var searchString:String = "";
+			public function onSearch(s:String):void {
+				searchString = s.toLowerCase();
+				chatsCollection.refresh();
+				if (s==""){
+					_list.selectedIndex = selectedChat;
+				}else {
+					
+				}
+				
+				
+				
+			}
+			public function sf(o:MessageModel):Boolean {
+				return o.contain(searchString);// && ( (!o.hasOwnWindow && defaultContent) || ( !defaultContent ) );
+			}
+			
+			private function contacDrag(event:DragEvent):void {
+				
+				try {
+					if (event.type == DragEvent.DRAG_COMPLETE ){
+						(_list.dataProvider as ArrayCollection).refresh();
+						_list.validateNow()
+						_chats.validateNow();
+						event.updateAfterEvent();
+						return
+					}
+					var n:String = (event.dragInitiator as List).name;
+					
+					if (event.type == DragEvent.DRAG_ENTER ){
+						if (n.indexOf("_chatItem") == 0){
+							_list.dropEnabled = true;
+						}
+						else {
+							_list.dropEnabled = false;
+							if (source.getItemIndexByID(bdId) > -1) {
+								return;
+							}
+							if (n.indexOf("contactItem") == 0)DragManager.acceptDragDrop(event.currentTarget as UIComponent);
+						}
+						return
+					}
+					if (event.type == DragEvent.DRAG_DROP){
+						
+						if ( (event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'] is GroupModel)){
+							try {
+								var gm:GroupModel = event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'] as GroupModel;
+								var recipients:Array = [];
+								for (var i:uint = 0; i< gm.itemCollection.length; i++){
+									recipients.push(gm.itemCollection.getItemAt(i).roster.jid)
+								}
+								var chatEvent:ChatEvent = new ChatEvent(ChatEvent.OPEN_ROOM);
+								chatEvent.recipients = recipients;
+								chatEvent.room = null;
+								dispatchEvent(chatEvent);
+							}catch (error:Error){}
+						}else {
+							var bdId:String = (event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'].id);
+							if (chatsCollection.getItemIndexByID(bdId) > -1){
+								selectedChat = chatsCollection.getItemIndexByID(bdId);
+								select(selectedChat)
+								return
+							}
+							var mm:MessageModel = new MessageModel(bdId,new UnescapedJID(bdId));
+							mm.windowid = this.id;
+							source.addItem(mm);
+							
+						}
+					}
+				}catch (error:Error){}
+			}
+			protected function onChange(event:IndexChangeEvent):void
+			{
+				selectedChat = event.newIndex;
+				try {
+					if ((_chats.selectedChild is StreamNavigatorContent) == false){
+						callLater(_chats.selectedChild['_outgoingMsgField'].setFocus );
+					}
+				}catch(error:Error){
+					
+				}
+			}
+			private function itemRenFunc(item:Object):IFactory {
+				if (item.type=="im") {
+					return new ClassFactory(Chatv2TabItemRenderer);
+				} if (item.type==StreamModel.KIND_STREAM) {
+					return new ClassFactory(Streamv2TabItemRenderer);
+				}else {
+					return new ClassFactory(Roomv2TabItemRenderer);
+				}
+			}
+			
+		
+			
+		]]>
+	</fx:Script>
+
+		<mx:HDividedBox width="100%" height="100%" dividerAffordance="100" horizontalGap="2" id="hdb"  dividerColor="#77db40"   >
+			<s:SkinnableContainer width="180"  minWidth="130" height="100%" top="0" bottom="0" styleName="chatList" id="_left"  >
+				<s:layout>
+					<s:VerticalLayout paddingBottom="1" paddingTop="1" paddingLeft="1" paddingRight="2" gap="1"/>
+				</s:layout>
+				<view:SearchBar searchFunction="onSearch" id="searchBar" />
+				<s:List id="_list" verticalScrollPolicy="auto" dragMoveEnabled="true" dragEnabled="true"  
+						horizontalScrollPolicy="off"
+						width="{_left.width}" height="100%"
+						dataProvider="{chatsCollection}" 
+						change="onChange(event)"
+						contentBackgroundAlpha="0" borderVisible="false"
+						itemRendererFunction="itemRenFunc"
+						dragEnter="contacDrag(event)"
+						dragComplete="contacDrag(event)" 
+						dragStart="contacDrag(event)"
+						dragDrop="contacDrag(event)"
+						name="_chatItem"
+						selectedIndex="@{selectedChat}"
+						>
+					<s:layout>
+						<s:VerticalLayout paddingLeft="2" paddingTop="2" paddingBottom="2" paddingRight="3" gap="1"/>
+					</s:layout>
+				</s:List>
+			</s:SkinnableContainer>
+			
+			<mx:ViewStack width="77%" height="100%" id="_chats" creationComplete="initStack(event)" > </mx:ViewStack>
+		</mx:HDividedBox>
+
+	 
+	
+</s:Group>

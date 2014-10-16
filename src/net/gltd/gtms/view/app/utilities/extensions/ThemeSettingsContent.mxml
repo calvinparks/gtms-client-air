@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extensions:ExtensionContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							 xmlns:s="library://ns.adobe.com/flex/spark" 
+							 xmlns:mx="library://ns.adobe.com/flex/mx"
+							 xmlns:extensions="net.gltd.gtms.view.app.utilities.extensions.*"
+							 creationComplete="init(event)"
+							 >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.utils.StyleModuleMarshaller;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			import mx.events.FileEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ModuleEvent;
+			import mx.events.StyleEvent;
+			
+			import spark.events.IndexChangeEvent;
+			private var 	_browseFile			:File,		
+							_themesHome			:File;
+			
+		
+			private var		_changed:Boolean;
+			
+			
+			[Bindable]
+			public var themesColl:ArrayCollection = new ArrayCollection([
+				{label:"Default",path:Main.defaultTheme}])
+			
+			
+			protected function removeTheme(event:MouseEvent):void
+			{
+				var pathToRem:String = _select.selectedItem.path
+				var toRem:File = new File(pathToRem);
+				if (toRem.exists) toRem.deleteFile();
+				_select.selectedIndex = 0;
+				
+				for (var i:uint = 0;i<themesColl.length;i++){
+					if (themesColl.getItemAt(i).path == pathToRem){
+						themesColl.removeItemAt(i);
+						break;
+					}
+				}
+				
+				
+			}
+			protected function loadTheme(event:MouseEvent):void
+			{
+				browsePlugins();
+			}
+			public function browsePlugins():void {
+				if (_browseFile == null)
+				{
+					_browseFile = File.desktopDirectory;
+					_browseFile.addEventListener(Event.SELECT, onThemeSelected);
+				}
+				_browseFile.browse([new FileFilter("*", "*.swf")] );
+			}
+			
+			private function onThemeSelected(e:Event):void
+			{
+				try {
+					var theme:File =  (e.target as File);
+					var f:File = new File(_themesHome.url);
+					f = f.resolvePath(theme.name);
+					theme.copyTo(f, true);
+					addTheme(f)
+				}catch (error:Error) {
+					trace (error.getStackTrace());
+				}
+			}
+			
+			
+			protected function init(event:FlexEvent):void
+			{
+				try {
+					_themesHome = File.applicationStorageDirectory.resolvePath("theme");
+					if (!_themesHome.exists) _themesHome.createDirectory();
+					var list:Array = _themesHome.getDirectoryListing();
+					var bytes:ByteArray = EncryptedLocalStore.getItem("currentThemeURL5");
+					var current:String;
+					if (bytes != null) current = bytes.readUTFBytes(bytes.length);
+					if (current != null){
+						var f:File =  new File(current);
+						if (f.exists)current = new File(current).name; 
+					}
+					for (var i:uint = 0; i<list.length;i++){ 
+						if ( (list[i] as File).extension != "swf" || (list[i] as File).isHidden)continue;
+						themesColl.addItem(
+							{label:list[i].name,path:list[i].url}
+						)
+						if (list[i].name == current)_select.selectedIndex = i+1;
+					}
+				}catch (error:Error){
+					trace( error.getStackTrace() );
+				}
+			}
+			
+			protected function onThemeChange(event:IndexChangeEvent):void
+			{
+				try {
+					trace (Main.currentTheme , _select.selectedItem.path)
+					if (Main.currentTheme == _select.selectedItem.path){
+						changed = false;
+					}else {
+						changed = true;
+					}
+				}catch(err:Error){
+					trace(err.getStackTrace());
+				};
+			}
+			private function addTheme(newTheme:File):void {
+				themesColl.addItem(
+					{label:newTheme.name,path:newTheme.url}
+				)
+				_select.selectedIndex = themesColl.length - 1;
+				changed = true;
+			}
+			private function set changed(b:Boolean):void {
+				
+				_changed = b;
+			}
+			[Bindable]
+			private function get changed():Boolean {
+				return _changed;
+			}
+			private function changeTheme(newPath:String):void {
+				var path:ByteArray = new ByteArray();
+				path.writeUTFBytes(newPath);
+				EncryptedLocalStore.setItem("currentThemeURL5",path);
+			}
+			
+			private function saveAndRelaunch():void {
+				save();
+				
+				
+				setTimeout(Main.LoadTheme,3800);
+				setTimeout(FlexGlobals.topLevelApplication.reboot,1100);
+			}
+			private function save():void {
+				changed = false;
+				changeTheme( _select.selectedItem.path );
+				
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Label text="Theme" top="3"/>
+	<s:HGroup width="100%" top="26">
+		<s:DropDownList id="_select" width="100%" dataProvider="{themesColl}" change="onThemeChange(event)" selectedIndex="0" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer" />
+		<s:Button label="Load" width="60" click="loadTheme(event)"	/>
+		
+	</s:HGroup>
+	<s:HGroup bottom="-46" left="-8">
+		<s:Button label="Save" enabled="{changed}" click="save()"/>
+		<s:Button label="Save And Relaunch" enabled="{changed}" click="saveAndRelaunch()"/>
+	</s:HGroup>
+	<s:Button label="Remove" click="removeTheme(event)" enabled="{_select.selectedIndex!=0}" bottom="-46" right="-8"	/>
+</extensions:ExtensionContent>

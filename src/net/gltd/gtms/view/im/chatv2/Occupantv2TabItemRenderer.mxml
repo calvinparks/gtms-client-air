@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:utils="net.gltd.gtms.view.im.utils.*"
+				autoDrawBackground="false" rightClick="showContextMenu(event)"
+				height="28" width="100%" >
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.GUI.contextMenu.ContextMenuItem;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.im.AvatarModel;
+			
+			import mx.binding.utils.BindingUtils;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.data.Presence;
+			
+			import spark.components.supportClasses.TextBase;
+			[Bindable]private var avatar:Object = AvatarModel.pathSmall;
+			[Bindable]private var show:Class;
+			
+			public override function set data(val:Object):void {
+				super.data = val;
+				try {
+					if (buddiesHolder.getInstance().getBuddy(data.jid.bareJID) != null){
+						BindingUtils.bindProperty(this,"label",buddiesHolder.getInstance().getBuddy(data.jid.bareJID),"nickname");
+					}else {
+						label = data.nickname;
+					}
+					//label = buddiesHolder.getInstance().getBuddy(data.nickname+"@"+data.room.connection.domain).nickname;
+				}catch (erFrom:Error){
+					label = data.nickname
+				}
+				try {
+					avatar = buddiesHolder.getInstance().getBuddy(data.nickname+"@"+data.room.connection.domain).avatar.ico;
+				}catch (erFrom:Error){
+					avatar = AvatarModel.pathSmall;
+				}
+				try {
+					if (data.room.connection.jid.bareJID == data.jid.bareJID){
+						show = null;//ShowStatusManager.getShow((data.rosterItem as RosterItemVO).show ,true).ico;
+					}
+					else {
+						try {
+							show = (buddiesHolder.getInstance().getBuddy(data.nickname+"@"+data.room.connection.domain) as IMBuddyModel).show;
+						}catch (erFrom:Error){
+							show = ShowStatusManager.getShowIco(data.rosterItem);
+						}
+						
+					
+					}
+				}catch (erFrom:Error){
+					avatar = AvatarModel.pathSmall;
+				}
+					
+			}
+			protected function showContextMenu(event:MouseEvent):void
+			{
+				var bd:IMBuddyModel;
+				try {
+					bd = buddiesHolder.getInstance().getBuddy(data.jid.bareJID) as IMBuddyModel;
+				}catch (error:Error){
+					return;
+				}
+				if (bd==null)return;
+				
+				var items:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = bd.renderMenuItemsFunction(bd);
+				var newItems:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = new Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem>();
+				
+				
+				for (var i:uint = 0; i< items.length; i++){
+					newItems.push( items[i] )
+				}
+				var grantParams:Array = [
+					new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(Room.AFFILIATION_ADMIN,null,data.affiliation != Room.AFFILIATION_ADMIN,false,grant,[Room.AFFILIATION_ADMIN]),
+					new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(Room.AFFILIATION_MEMBER,null,data.affiliation != Room.AFFILIATION_MEMBER,false,grant,[Room.AFFILIATION_MEMBER]),
+					new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(Room.AFFILIATION_NONE,null,data.affiliation != Room.AFFILIATION_NONE,false,grant,[Room.AFFILIATION_NONE]),
+			//	new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(Room.AFFILIATION_OUTCAST,null,data.affiliation != Room.AFFILIATION_OUTCAST,false,grant,[Room.AFFILIATION_OUTCAST]),
+					new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(Room.AFFILIATION_OWNER,null,data.affiliation != Room.AFFILIATION_OWNER,false,grant,[Room.AFFILIATION_OWNER])
+					]
+				
+				newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Grant "+data.nickname+"...",null,data.room.role == Room.ROLE_MODERATOR, true,null,null,grantParams));
+				newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Kick "+data.nickname+"...",null,(data.room.role == Room.ROLE_MODERATOR && data.role != Room.ROLE_MODERATOR),false,kick));
+				newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Ban "+data.nickname+"...",null,(data.room.role == Room.ROLE_MODERATOR && data.role != Room.ROLE_MODERATOR),false,data.room.ban,[[data.jid]]));
+				
+				
+				
+				
+				net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu( event, newItems );
+				
+			}
+			private function grant(affiliation:String):void{
+				var r:Room = data.room as Room;
+				r.grantUser(affiliation,[data.jid]);
+				
+				
+			}
+			private function kick():void{
+				var r:Room = data.room as Room; 
+				r.kickOccupant(data.nickname,"");
+				
+			}
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected"  stateGroups="selectedStates" />
+		<s:State name="hovered" />
+		<s:State name="down" />
+		<s:State name="downAndShowsCaret" stateGroups="selectedStates"  />
+		<s:State name="hoveredAndShowsCaret" stateGroups="selectedStates" />
+	</s:states>
+	<s:Rect radiusX="4" radiusY="4" top="0" left="0" bottom="0" right="0">
+		<s:stroke>
+			<s:SolidColorStroke color="#dadee2" alpha=".85"/>
+		</s:stroke>
+		<s:fill>
+			<s:SolidColor  color="#F9F9F9" alpha=".95"/>
+		</s:fill>
+	</s:Rect>
+	<s:BitmapImage width="23"
+				   height="23"
+				   smooth="true"
+				   source="{avatar}" 
+				   scaleMode="zoom" verticalAlign="middle" horizontalAlign="left" 
+				   left="2" top="3"
+				   />
+	<s:HGroup  top="7" left="26" right="12" verticalAlign="middle">
+		<utils:ShowLed showLed="{show}" visible="{show!=null}" includeInLayout="{show!=null}" id="_show" verticalCenter="0" />
+		<s:Label text="{label}" width="100%" styleName="_contactItemDN" color="#000000" maxDisplayedLines="1" verticalCenter="0" />
+	</s:HGroup>
+
+	
+</s:ItemRenderer>

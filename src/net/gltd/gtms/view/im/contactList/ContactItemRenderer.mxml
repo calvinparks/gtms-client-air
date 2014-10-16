@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?><!-- 
+** ContactItemRenderer.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 14, 2012 
+* 
+*
+--> 
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" width="100%"
+				styleName="_contactItemRenderer"
+				rollOver="onTT(event)"
+				rollOut="onTT(event)"
+				mouseDown="onTT(event)"
+				click="clickEvent(event)"
+				rightClick="clickEvent(event)" 
+				>
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected" />
+		<s:State name="sel" />
+		<s:State name="glow" basedOn="normal" />
+	</s:states>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.model.im.AvatarModel;
+			
+			import flash.utils.clearTimeout;
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ToolTipEvent;
+			
+			[Bindable]
+			public var dItems:ArrayCollection = new ArrayCollection();
+			//public var clickFunction:Function = null;
+			
+			private function onToolTip(event:ToolTipEvent):void {
+				var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+				e.id = data.id;
+				e.toolTip = event;
+				dispatchEvent(e);
+			
+			}
+			private function clickEvent(event:MouseEvent):void
+			{ 
+				try {
+					if (_camera.contains(event.target as DisplayObject) || event.target == _camera){
+						return;
+					}
+				}catch (error:Error){}
+				if (data.clickFunction!=null)data.clickFunction(event);
+
+			}
+			
+			
+			protected var tO:uint;
+			protected function onTT(event:MouseEvent):void
+			{
+				var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+				e.id = data.id;
+				e.mouseEvent = event;
+				if (event.type == MouseEvent.ROLL_OVER){
+					tO = setTimeout(dispatchEvent,1700,e);
+					return;
+				}
+			
+				dispatchEvent(e);
+				clearTimeout(tO);
+				
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:SkinnableContainer id="_cont" left="0" right="0"  width="100%"
+						  verticalCenter="0"
+						  height="28"
+						  styleName="_contactItemRendererSkin"
+						  styleName.selected="_contactItemRendererSelectedSkin">
+		<s:layout>
+			<s:HorizontalLayout verticalAlign="middle" gap="3"/>
+		</s:layout>
+		<s:BitmapImage height="26" width="26" left="2" id="_avatar" scaleMode="zoom" verticalAlign="top" horizontalAlign="left" source="{data.avatar.ico}" smooth="true" smoothingQuality="default" />
+		<s:Label id="__label" text="{data.nickname}" styleName="_contactItemDN"/>
+	</s:SkinnableContainer>
+	<s:Image height="10"  right="5" verticalCenter="0" id="_camera"
+				   source="{data.camera}" visible="{data.camera!=null}" includeInLayout="{data.camera!=null}" smooth="true" smoothingQuality="default"
+				   buttonMode="true" click="data.icoClickFunction(event)"
+				   
+				   />
+	<s:BitmapImage height="18" width="18" right="5" verticalCenter="0" scaleMode="stretch" id="_ico" source="{data.ico}" includeInLayout="{data.ico!=null}" smooth="true" smoothingQuality="default" />
+</s:ItemRenderer>

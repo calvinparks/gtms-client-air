@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:chat="net.gltd.gtms.view.im.chat.*"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%" creationComplete="init(event)"
+		 xmlns:parsley="http://www.spicefactory.org/parsley" removedFromStage="onRemoved(event)">
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.window.CustomWindow;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.events.UserEvent;
+			import net.gltd.gtms.model.im.MessageModel;
+			import net.gltd.gtms.model.im.RoomModel;
+			import net.gltd.gtms.utils.FilterArrayCollection;
+			
+			import flexunit.utils.Collection;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.data.Message;
+			
+			import spark.components.Button;
+			
+		
+			public			var		chats			:FilterArrayCollection;
+	
+			
+			private			var		_selectedIndex	:int,
+									_selectedID		:String,
+									_openTabs		:Object,
+									_inviteWindow	:CustomWindow,
+									_inviteList		:InviteList;
+			[Bindable]
+			private			var		_dropProvider	:FilterArrayCollection;;
+			
+			[Bindable]
+			private function get selectedIndex():int {
+				_selectedIndex = chats.getItemIndexByID(selectedID);
+				return _selectedIndex;
+			}
+			private function set selectedIndex(i:int):void {
+				if (i < 0)return;
+				_selectedIndex = i;
+				_selectedID = chats.getItemAt(i).id;
+			}
+			[Bindable]
+			public function set selectedID(id:String):void {
+				selectedIndex = chats.getItemIndexByID(id);
+				_selectedID = id;
+			}
+			
+			public function get selectedID():String {
+				return _selectedID;
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				_openTabs = {};
+				_dropProvider = new FilterArrayCollection();
+				chats.addEventListener(CollectionEvent.COLLECTION_CHANGE,onChatsCollChange);
+				_tabs.addEventListener(UserEvent.USER_CLOSE_CHAT,onTabRemoved); 
+				_tabs.dataProvider =  _stacks;	
+				chats.refresh();
+			}
+			private function addChat(data:MessageModel):void {
+		
+				var chat:ChatContent = new ChatContent();
+				chat.data = data;
+				chat.addEventListener(ChatEvent.USER_INVITE,onUserInvite);
+				
+				_stacks.addChild(chat);
+				_openTabs[data.id] = true;
+				
+				_dropProvider.addItem({label:data.label, id:data.id});
+				
+				
+			}
+			
+			
+			private function addRoom(data:RoomModel):void {
+				trace ("ADD ROOM!!!",data);
+				var room:RoomContent = new RoomContent();
+				room.data = data;
+				room.addEventListener(ChatEvent.USER_INVITE,onUserInvite);
+				_stacks.addChild(room);
+				_openTabs[data.id] = true;
+				_dropProvider.addItem({label:data.label, id:data.id});
+				
+			}
+			
+			private function onChatsCollChange(event:CollectionEvent):void {
+				if (event.kind == CollectionEventKind.ADD){
+					if ( event.items[0].type == "room" ){
+						addRoom ( event.items[0]as RoomModel );
+					}else {
+						addChat(event.items[0] as MessageModel);
+					}
+					return;
+				}
+				if (event.kind == CollectionEventKind.REFRESH){
+					for (var j:uint = 0; j<chats.length;j++){
+						if ( (chats.getItemAt(j) as MessageModel).open && _openTabs[chats.getItemAt(j).id] != true){
+							
+							if ( chats.getItemAt(j).type == "room" ){
+								addRoom ( chats.getItemAt(j) as RoomModel );
+							}else {
+								addChat ( chats.getItemAt(j) as MessageModel );
+							}
+						}
+					}
+					return;
+				}
+			}
+			protected function onTabRemoved(event:UserEvent):void {
+				try {
+					chats.getItemByID(event.recipientID).open = false;
+					_openTabs[event.recipientID] = undefined;
+					delete _openTabs[event.recipientID]
+					var _id:String;
+					for (var i:uint = 0; i<_stacks.length;i++){
+						if (_stacks.getChildAt(i) is RoomContent){
+							_id = (_stacks.getChildAt(i) as RoomContent)._id;
+							(_stacks.getChildAt(i) as RoomContent).room.leave();
+						}else {
+							_id = (_stacks.getChildAt(i) as ChatContent)._id;
+						}
+						if(_id == event.recipientID){
+							_stacks.removeChildAt(i)
+							break;
+						}
+					}
+					_dropProvider.removeByID(event.recipientID);
+					chats.refresh();
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+			}
+			public function removeAll():void {
+				_stacks.removeAll();
+			}			
+			protected function onRemoved(event:Event):void
+			{
+				try {
+					chats.removeEventListener(CollectionEvent.COLLECTION_CHANGE,onChatsCollChange);		
+					_tabs.removeEventListener(UserEvent.USER_CLOSE_CHAT,onTabRemoved);
+				}catch (error:Error){
+					
+				}
+			}
+			protected function onUserInvite(event:ChatEvent):void {
+				if (_inviteWindow == null || _inviteWindow.closed){
+					_inviteWindow = new CustomWindow();
+					_inviteWindow.maximizable = false;
+					_inviteWindow.closeable = true;
+					_inviteWindow.minimizable = true;
+					_inviteWindow.resizable = true;
+					_inviteWindow.title = "Invite People To Chat With: "+event.currentTarget.label;
+					_inviteWindow.width = 390;
+					_inviteWindow.height = 260;
+					_inviteWindow.move(Screen.mainScreen.bounds.width/2 - _inviteWindow.width/2, Screen.mainScreen.bounds.height/2 - _inviteWindow.height/2 - 20);
+			
+					_inviteWindow.open(true);
+	
+					_inviteWindow._container.bottom = 43;
+					
+					var saveButton:Button = new Button();
+					saveButton.label = "Invite";
+					_inviteWindow.addElement(saveButton);
+					saveButton.bottom = 8;
+					saveButton.right = 10;
+
+					saveButton.addEventListener(MouseEvent.CLICK,doInvite);
+					
+					_inviteList = new InviteList();
+					_inviteWindow._container.addElement(_inviteList);
+					
+					
+				}else {
+					
+				}
+				
+				if (event.currentTarget is RoomContent){
+					var room:Room = (event.currentTarget as RoomContent).room;
+					_inviteList.room = room;
+					_inviteList.occupants = [];
+					for (var i:uint = 0; i<room.length;i++){
+						_inviteList.occupants.push( (room.getItemAt(i) as RoomOccupant).jid.bareJID )
+					}
+				}else {
+					_inviteList.selectedIds = [event.currentTarget._id];
+				}
+				_inviteList.init();
+				
+				
+			}
+			protected function doInvite(event:MouseEvent):void {
+				if (_inviteList._list.selectedItems.length == 0)return;
+				var recipients:Array = [];
+				for (var i:uint = 0; i < _inviteList._list.selectedItems.length;i++){
+					recipients.push( _inviteList._list.selectedItems[i].jid )
+				}
+				
+				var chatEvent:ChatEvent = new ChatEvent(ChatEvent.OPEN_ROOM);
+				chatEvent.recipients = recipients;
+				chatEvent.room = _inviteList.room;
+				dispatchEvent(chatEvent);
+				
+				_inviteList.onRemove();
+				_inviteWindow.close();
+				
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+
+	<mx:ViewStack top="28" width="100%" height="100%"
+					borderVisible="false" id="_stacks"
+				 	selectedIndex="@{selectedIndex}">
+		<!--mx:Repeater dataProvider="{chats}" id="_rpt">
+			<chat:ChatContent data="{_rpt.currentItem}"/>
+		</mx:Repeater-->
+	</mx:ViewStack>
+	<s:TabBar id="_tabs" top="1" left="0" height="27" minWidth="120" 
+			  maxWidth="{_stacks.width-50}"  styleName="chatBar"
+			  itemRenderer="net.gltd.gtms.view.utils.ChatTab"
+			/>
+	<!--   skinClass="com.gtms.skins.utils.ChatTabBarSkin" -->
+	<s:DropDownList
+		dataProvider="{_dropProvider}"
+		visible="{_dropProvider.length>4}"
+		enabled="true"
+		focusEnabled="true" 
+		change="{_tabs.selectedIndex=_drop.selectedIndex}"
+		id="_drop" 
+		right="0" top="1" 
+		itemRenderer="net.gltd.gtms.view.utils.ListItem2" />
+	<!-- skinClass="com.gtms.skins.utils.ChatDropDownList" -->
+	
+</s:Group>

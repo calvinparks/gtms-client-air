@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+** IM_module.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.1 
+*	 Created: Jun 12, 2012 
+* 
+*
+-->  
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:im="net.gltd.gtms.view.im.*"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:app="net.gltd.gtms.view.app.*"
+		  xmlns:parsley="http://www.spicefactory.org/parsley"
+		  xmlns:utils="net.gltd.gtms.view.utils.*" 
+		  width="100%" height="100%" xmlns:view="net.gltd.gtms.view.*"
+		  addedToStage="ats(event)" removedFromStage="rfs(event)"
+		  >
+	<s:layout>
+		<s:VerticalLayout paddingTop="3" gap="1" />
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import beans.IMParsleyBeans;
+			
+			import net.gltd.gtms.controller.im.IMmanager;
+			import net.gltd.gtms.model.dataHolder;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			import mx.events.ChildExistenceChangedEvent;
+			import mx.events.FlexEvent;
+			import mx.events.StateChangeEvent;
+			
+			import org.spicefactory.parsley.core.context.Context;
+			import org.spicefactory.parsley.flex.FlexContextBuilder;
+			
+			import spark.events.IndexChangeEvent;
+
+			
+			public	var		context				:Context;
+			
+			[Inject][Bindable]
+			public var manager:IMmanager;
+			
+			[Bindable][Embed(source="assets/skins/utils/search_ico.png")]
+			private var searchIco:Class;
+			
+			[Bindable]
+			private var searchOptions:ArrayCollection = new ArrayCollection([{label:"Roster"},{label:"Directory"}])
+			
+			private function init():void
+			{
+				SearchBar.ico = searchIco;
+				dataHolder.getInstance().searchBar = searchBar;
+				dataHolder.getInstance().searchBarOption = "Roster";
+				
+				tabs.manager.bottomTabs = _buttonScope2;
+				
+				
+				dataHolder.getInstance().interfaces = _interfaces;
+			}
+			
+			protected function ats(event:Event):void
+			{
+				context = FlexContextBuilder.build(IMParsleyBeans,this,FlexGlobals.topLevelApplication['_parslaey'].context);
+				context.viewManager.addViewRoot( this );
+				callLater(init);
+			}
+			
+			protected function rfs(event:Event):void
+			{
+				context.viewManager.removeViewRoot(this);
+				context.destroy();
+				context = null;
+			}
+			
+			protected function _interfaces_childAddHandler(event:ChildExistenceChangedEvent):void
+			{
+				_tabs.includeInLayout = _tabs.visible = _interfaces.length>1;
+				
+			}
+			
+			protected function initScroll(event:FlexEvent):void
+			{
+				contactsScroll.verticalScrollBar.stepSize = 40;
+				
+			}
+			
+			protected function _searchOption_changeHandler(event:IndexChangeEvent):void
+			{
+				
+				dataHolder.getInstance().searchBarOption = _searchOption.selectedItem.label;
+				try {
+					searchBar.searchString=searchBar.srchStr.text;
+				}catch (error:Error){
+					
+				}
+			}
+			
+			protected function searchBar_keyDownHandler(event:KeyboardEvent):void
+			{
+				try {
+					if(event.keyCode==14)searchBar.searchString=searchBar.srchStr.text;
+				}catch (error:Error){
+					
+				}
+			}
+			
+			
+			
+			protected function _tabs_changeHandler(event:IndexChangeEvent):void
+			{
+				
+				this.callLater(function():void{
+					searchBar.searchString = searchBar.srchStr.text = searchBar.currentSearch;
+				});
+				
+	
+			
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	
+	<app:MainTabs id="tabs"/>
+	<im:IMStatus/>
+	<s:Spacer height="4"			/>
+	<mx:HRule width="100%"			/>
+	<s:Spacer height="4"			/>
+	<s:HGroup width="100%" id="_buttonScope2" verticalAlign="middle"  >
+		<s:Group width="100%">
+			<view:SearchBar left="{Number(_interfaces.selectedIndex==0)*38}" id="searchBar" width="100%" keyDown="searchBar_keyDownHandler(event)"	/>
+			<s:DropDownList id="_searchOption"
+							skinClass="net.gltd.gtms.skins.SearchOptionSkin"
+							change="_searchOption_changeHandler(event)"
+							includeInLayout="{_interfaces.selectedIndex==0}"
+							visible="{_interfaces.selectedIndex==0}" dataProvider="{searchOptions}"
+							selectedIndex="0" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer" />
+		</s:Group>
+		
+	</s:HGroup>
+	<s:Spacer height="5"	/> 
+	<s:TabBar dataProvider="{_interfaces}"  styleName="interfacesTabs" change="_tabs_changeHandler(event)"  id="_tabs" visible="{_interfaces.length>1}" includeInLayout="{_interfaces.length>1}" />
+	<mx:ViewStack width="100%" height="100%" id="_interfaces" childAdd="_interfaces_childAddHandler(event)">
+		<s:NavigatorContent width="100%" height="100%"  id="_cl" styleName="rosterContainer" label="Contacts"  >			
+			<view:InterfaceListHeader includeInLayout="{manager.app.dynamicItems.length>0}" visible="{manager.app.dynamicItems.length>0}">
+				<s:DataGroup dataProvider="{manager.app.dynamicItems}" verticalCenter="-1">
+					<s:layout>
+						<s:HorizontalLayout paddingLeft="3" paddingRight="3"/>
+					</s:layout>
+				</s:DataGroup>
+			</view:InterfaceListHeader>
+			
+			<s:Scroller id="contactsScroll" left="0" right="0" creationComplete="initScroll(event)"
+						top="{(manager.app.dynamicItems.length/Math.max(1,manager.app.dynamicItems.length))*33}"
+						bottom="0"
+						>
+				<!-- vcreationComplete="{contactsScroll.verticalScrollBar.pageSize=0;}" -->
+				 <s:viewport>
+					 <im:IMcontactsList left="0" right="0" top="0" clipAndEnableScrolling="true" contentBackgroundAlpha="1" contentBackgroundColor="#FFF000"  />
+				 </s:viewport>
+					
+		 
+					
+		
+			</s:Scroller>	
+		</s:NavigatorContent>
+	</mx:ViewStack>
+		
+	<!-- disabled / waiting for plugins solution
+		<s:Spacer height="1"	/>
+		<im:IMFilterBar			/>
+	-->
+	<s:SkinnableContainer>
+		
+	</s:SkinnableContainer>
+</s:Module>

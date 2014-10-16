@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** UEMBase.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 21, 2012 
+* 
+*
+--> 
+<s:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  styleName="uemBase"
+		  maxHeight="120" creationCompleteEffect="{showEff}" closeEffect="{hideEff}"
+		  >
+	<fx:Declarations>
+		<s:Sine id="powerEasing" easeInFraction=".2"/>
+		<s:Parallel id="showEff" duration="260" >
+			<s:Fade alphaFrom="0.0" alphaTo="1.0" easer="{powerEasing}" />
+			<s:Rotate3D angleXFrom="-30" angleXTo="0" easer="{powerEasing}" />
+			
+		</s:Parallel>
+		<s:Parallel id="hideEff" duration="200">
+			<s:Fade alphaFrom="1.0" alphaTo="0.0" easer="{powerEasing}" />
+			<s:Rotate3D angleXFrom="0" angleXTo="15" />
+		</s:Parallel>
+		<!--
+		<s:transitions>
+			
+			<s:Transition id="myTransition" fromState="*" toState="*">
+			
+				<s:Parallel id="t1" targets="{[p1,p2,p3]}">
+			
+					<s:Move  duration="400"/>
+					<s:Resize duration="400"/>
+				</s:Parallel>
+			</s:Transition>
+		</s:transitions>
+		-->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import spark.components.supportClasses.TextBase;
+			[Bindable]
+			public	var	message		:String = "";
+			[Bindable]
+			public	var	heading		:String = "";
+			[Bindable]
+			public	var features	:ArrayCollection;
+			
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+		]]>
+	</fx:Script>
+	
+	<s:Label id="nickname" text="{heading}" left="10" top="10" bottom="20" right="30" fontSize="12" maxDisplayedLines="1" />
+	<s:Label id="displayMsg" text="{message}" left="14" top="33" fontSize="12" right="10" creationComplete="{displayMsg.bottom = int(features.length>0)*39 + 4;}" />
+
+	<s:DataGroup id="buttonsRepeter"
+				 left="10"
+				 bottom="8"
+				 mouseEnabled="false"
+				 itemRenderer="net.gltd.gtms.GUI.UEM.UEMbutton"
+				 dataProvider="{features}" >
+		<s:layout>
+			<s:HorizontalLayout gap="3"/>
+		</s:layout>
+	</s:DataGroup>
+	
+	<!--	
+		<s:Button label="{buttonLabel}" id="_bt1" click="f1(event)" visible="{buttonVisible}"  skinClass="net.gltd.gtms.skins.utils.EventsButton" />
+		<s:Button label="{secondButtonLabel}" click="{f2(event)}" visible="{secondButtonVisible}"  skinClass="net.gltd.gtms.skins.utils.EventsButton" />
+	-->
+	 
+		<s:SkinnableContainer top="0" right="0" styleName="_closeMenuCorner">
+		<s:Button width="16" click="{this.close()}" height="15"
+				  id="closeButton"
+				  styleName="_appCloseButton"
+				  buttonMode="true" verticalCenter="0" horizontalCenter="0" />
+	</s:SkinnableContainer>
+</s:Window>

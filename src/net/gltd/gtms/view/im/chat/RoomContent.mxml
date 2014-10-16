@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent
+					implements="mx.core.INavigatorContent"
+					xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+					xmlns:chat="net.gltd.gtms.view.chat.*"
+					xmlns:IM="net.gltd.gtms.view.IM.*"
+					xmlns:chat1="net.gltd.gtms.model.chat.*"
+					xmlns:parsley="http://www.spicefactory.org/parsley"
+					xmlns:chat2="net.gltd.gtms.view.im.chat.*" removedFromStage="onRemove(event)" >
+	
+	<fx:Script>
+		
+		<![CDATA[
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.im.MessageModel;
+			import net.gltd.gtms.model.im.RoomModel;
+			
+			import flash.utils.setTimeout;
+			
+			import flashx.textLayout.elements.DivElement;
+			import flashx.textLayout.elements.LinkElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			
+			import mx.collections.ArrayCollection;
+			import mx.rpc.xml.SimpleXMLDecoder;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.Message;
+			import org.igniterealtime.xiff.data.Presence;
+			import org.igniterealtime.xiff.data.im.RosterItemVO;
+			import org.igniterealtime.xiff.events.PropertyChangeEvent;
+			import org.igniterealtime.xiff.events.RoomEvent;
+			import org.igniterealtime.xiff.im.Roster;
+
+			public var who:String;
+			
+			[Bindable]
+			private			var			_tf						:TextFlow = new TextFlow();
+			private			var			_composing				:Message,
+										_lastMsg				:Object		= {user:"",date:"",readed:false},
+										_lastEntry				:DivElement,
+										_colors					:Object = {
+																	me: {t:0x14478e,b:SettingsManager.CHAT_COLOR},
+																	buddy: {t:0xd84f0c,b:SettingsManager.CHAT_COLOR},
+																	info: {t:0xcfcfcf,b:0xcfcfcf}
+																},
+										_roster					:RosterItemVO,
+										_today					:Date = new Date(),
+										
+										_data					:RoomModel,
+										
+										_state					:String = Message.STATE_ACTIVE,
+										_stateTimer				:Timer = new Timer (800),
+										_stillTyping			:Boolean = false,
+										
+										readedMsgs				:Array;
+										
+								
+										
+										
+			[Bindable]
+			public			var			room					:Room;
+			
+
+			
+			public			var			_id						:String,
+										glow					:Boolean = false;
+			[Bindable]
+			public			var			bd						:Object = {composing:false};
+			
+			[Bindable]
+			public			var			tabColor				:uint = 0x6d9cc2;
+			public			var			tabCurrentState			:String = "normal";
+			
+			
+			private			var			xmlDecoder				:SimpleXMLDecoder = new SimpleXMLDecoder();
+										
+			public			var			roomMembers				:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			public function get data():RoomModel{
+				return _data;
+			}
+			public function set data(val:RoomModel):void {
+				try {
+					_data = val;
+					label= _data.label;
+					room = _data.room;
+					_id = _data.id;
+					trace ("set data room");
+					room.addEventListener(RoomEvent.USER_JOIN,onRoom);
+					room.addEventListener(RoomEvent.USER_DEPARTURE,onRoom);
+					room.addEventListener(RoomEvent.USER_PRESENCE_CHANGE,onRoom);
+					room.addEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+					room.addEventListener(RoomEvent.GROUP_MESSAGE,onRoom);
+					room.addEventListener(RoomEvent.PRIVATE_MESSAGE,onRoom);
+					room.addEventListener(RoomEvent.ROOM_DESTROYED,onRoom);
+					room.addEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+					room.addEventListener(RoomEvent.USER_BANNED,onRoom);
+					
+					setTimeout(initMessages,150)
+				}catch (error:Error){
+					
+				}
+			}
+			private function initMessages():void {
+				
+				var i:uint;
+				var from:String;
+				var dn:String;
+				var m:Message;
+				var d:Date;
+				var delay:int = 250;
+				
+				for (i = 0; i<_data.readed.length;i++){
+					m = _data.readed[i];
+					if (m==null)continue;
+					dn = m.from.resource;
+					if (m.from.resource == null){
+						from = "info";
+						dn = m.from.node;
+					}
+					else if (m.from.resource == m.to.node)from = "me";
+					else from = "buddy";
+					if (m.time == null)d = new Date();
+					else d = m.time;
+					
+					displayMessage(dn,getDate(new Date()),m.body,from,true);
+					delay+=1
+					
+				}
+				for (i = 0; i<_data.messages.length;i++){
+					m = _data.getMessage()
+					if (m==null)continue;
+					dn = m.from.resource;
+					if (m.from.resource == null){
+						from = "info";
+						dn = m.from.node;
+					}
+					else if (m.from.resource == m.to.node)from = "me";
+					else from = "buddy";
+					if (m.time == null)d = new Date();
+					else d = m.time;
+					displayMessage(dn,getDate(new Date()),m.body,from,false);
+					delay+=20;
+				}
+				
+			}
+			private function addOccupant():void {
+				_rosterInfo.occupants.refresh();
+			}
+			private function removeOccupant(occupant:UnescapedJID):void {
+				_rosterInfo.occupants.refresh();
+			}
+			private function onRoom(e:RoomEvent):void {
+				try {
+					var infoMessage:String;
+					var usernickname:String = "";
+					try {
+						usernickname = e.nickname;
+						usernickname = buddiesHolder.getInstance().getBuddy(usernickname+"@"+room.connection.jid.domain).nickname;
+					}catch (errorDn:Error){
+					}
+					
+					if (e.type == RoomEvent.USER_JOIN){
+						addOccupant()//((room.getItemAt(room.length-1) as RoomOccupant))
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_ENTER,{
+							nickname:usernickname
+						})
+						setTimeout(displayMessage,150,"",getDate(new Date()),infoMessage,"info",false);
+					}
+					else if(e.type == RoomEvent.USER_DEPARTURE){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_LEFT,{
+							nickname:usernickname
+						})
+						displayMessage("",getDate(new Date()),infoMessage,"info");
+						removeOccupant((e.data as Presence).from.unescaped)
+					}
+					else if (e.type == RoomEvent.USER_BANNED){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_BANNED,{
+							nickname:usernickname
+						})
+						displayMessage("",getDate(new Date()),infoMessage,"info");
+						removeOccupant((e.data as Presence).from.unescaped)
+					}
+					
+					else if (e.type == RoomEvent.GROUP_MESSAGE || RoomEvent.PRIVATE_MESSAGE){	
+						var m:Message = e.data as Message;
+						
+						if (m == null)return;
+					
+						_data.readed.push(m);
+						var from:String = e.nickname;
+						var c:String = "buddy";
+						if (room.nickname == e.nickname){
+							c = "me"
+							from = "Me";
+						}else {
+							if (from == null){
+								try {
+									from = buddiesHolder.getInstance().getBuddy(from+"@"+m.to.domain).nickname;
+								}catch (erFrom:Error){
+									from = m.from.node;
+								}
+								c = "info"
+							}
+							try {
+								from = buddiesHolder.getInstance().getBuddy(from+"@"+m.to.domain).nickname;
+							}catch (erFrom:Error){
+								from = m.from.node;
+							}
+						}
+						var msg:String = "";
+						if (m.body)msg=m.body;
+						setTimeout(displayMessage,150,from,getDate(new Date()),msg,c);
+						if (tabCurrentState == "normal")tabColor = 0x00BE00;
+					}
+				}catch (err:Error){
+					
+				}
+				
+			}
+			private function init():void {
+				try {
+					_tf.paddingTop = 5;
+					_tf.paddingLeft = 6;
+					_tf.paddingRight = 6;
+				
+					_state = Message.STATE_ACTIVE;
+					_stateTimer.addEventListener(TimerEvent.TIMER,stateTick);
+					
+					_rosterInfo.me = room.connection.jid;
+					_rosterInfo.init( room.source , room);
+					_rosterInfo._inviteButton.addEventListener(MouseEvent.CLICK,onInviteClick);
+					this.addEventListener("stateChanged",onStateChange);
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+			}		
+			
+			private function set state(s:String):void {
+				_state = s;
+				dispatchEvent(new Event("stateChanged"));
+			}
+			private function get state():String {
+				return _state
+			}
+			private function onStateChange(event:Event):void {
+				_data.sendState(state);
+			}
+			private function stateTick(event:TimerEvent):void {
+				if (_stateTimer.currentCount%5==1){
+					_stillTyping = false;
+				}else if (_stateTimer.currentCount%5==2){
+					if (!_stillTyping){
+						state = Message.STATE_PAUSED;
+					}
+				}else  if (_stateTimer.currentCount%5==0){
+					if (!_stillTyping){
+						state = Message.STATE_ACTIVE;
+						_stateTimer.stop();
+						_stateTimer.reset()
+					}
+				}
+			}
+			protected function onKeyDown(event:KeyboardEvent):void
+			{
+				if (event.keyCode == 13 && event.shiftKey == false){
+					var msg:String = _outgoingMsgField.text;
+					if (msg.lastIndexOf("\n") == msg.length -1){
+						msg = msg.slice(0,msg.lastIndexOf("\n"))
+					}
+					room.sendMessage(msg);
+					_outgoingMsgField.text = "";
+				}else {
+					_stillTyping = true;
+					if (state != Message.STATE_COMPOSING){
+						state = Message.STATE_COMPOSING;
+						if (!_stateTimer.running)_stateTimer.start();
+					}else {
+					
+					}
+				}
+			}
+			protected function onInviteClick(event:MouseEvent):void {
+				dispatchEvent( new ChatEvent(ChatEvent.USER_INVITE));
+			}
+			
+			
+			private function getDate(date:Date):String {
+				var min:String = date.getMinutes().toString();
+				if (min.length ==1) min = "0"+min;
+				var h:String = date.getHours().toString();
+				if (h.length ==  1)h = "0"+h;
+				if (date.date < _today.date || date.month != _today.month){
+					return date.date+"."+(date.month+1)+"."+date.fullYear+", "+h+ ":"+min;
+				}
+				return h+ ":"+min;
+			}
+			private function displayMessage(_from:String,_date:String,_body:String,color:String,readed:Boolean=false):void {
+				try {
+					var newEntry:DivElement
+					var p:ParagraphElement
+					var body:SpanElement
+					var author:SpanElement
+					
+					body = new SpanElement();
+					body.color = _colors[color].b;
+					var bodys:Array
+					
+					if (_body.toLowerCase().indexOf("http://") > -1 || _body.toLowerCase().indexOf("https://") > -1){
+						var protocol:String;
+						if (_body.toLowerCase().indexOf("https://") > -1)protocol = "https://";
+						else protocol = "http://";
+						
+						var _bodyArray:Array = _body.split(protocol);
+						var sliceTo:int = (_bodyArray[1] as String).indexOf(" ");
+						if (sliceTo == -1) sliceTo = (_bodyArray[1] as String).length;
+						var href:String = protocol+(_bodyArray[1] as String).slice(0,sliceTo)
+						_bodyArray[1] =_bodyArray[1].toString().slice( (_bodyArray[1] as String).indexOf(" "),(_bodyArray[1] as String).length-1)
+						_body = _bodyArray[0] + "<s:a href='"+href+"'>"+href+"</s:a>"+_bodyArray[1]
+						
+						bodys = [ _bodyArray[0], href,_bodyArray[1] ]
+					}
+					body.text = _body;
+					
+					
+					if (_lastMsg.user == _from && _lastMsg.date == _date && _lastMsg.readed == readed){
+						p = new ParagraphElement();
+						_lastEntry.addChild(p);		
+						p.paddingLeft = 7;
+						if (bodys != null && bodys.length > 0){
+							for (var iB:uint = 0; iB < bodys.length; iB++){
+								if (bodys[iB].indexOf ("http")==0){
+									var a:LinkElement = new LinkElement();
+									var aN:SpanElement = new SpanElement()
+									aN.text = bodys[iB]
+									a.addChild(aN)
+									a.href = bodys[iB];
+									a.setStyle("color","#0000FF");
+									aN.setStyle ("textDecoration","none");
+									a.textDecoration = "none";
+									p.addChild(a);
+								}else {
+									var bd1:SpanElement = new SpanElement();
+									bd1.text = bodys[iB];
+									p.addChild(bd1);
+								}
+							}
+						}else {
+							p.addChild(body);
+						}
+						if (msgDisplay)	msgDisplay.appendText("");
+						
+						return;
+					}
+					
+					author = new SpanElement();
+					
+					if (color == null || color.length == 0){
+						color = "buddy";
+					}
+					
+					
+					author.color = _colors[color].t;
+					
+					author.fontWeight = "bold";
+					author.text =  _from +" ["+_date+"]  "; 
+					
+					newEntry = new DivElement();
+					p = new ParagraphElement();
+					if (_lastEntry == null){
+						p.paragraphSpaceBefore = 0;
+					}else {
+						p.paragraphSpaceBefore = 7;
+						p.paragraphSpaceAfter = 4;
+					}
+					newEntry.addChild(p);		
+					
+					_lastEntry = newEntry;
+					
+					p.addChild(author);
+					if (bodys != null && bodys.length > 0){
+						for (var iB2:uint = 0; iB2 < bodys.length; iB2++){
+							
+							if (bodys[iB2].indexOf ("http")==0){
+								var a2:LinkElement = new LinkElement();
+								var aN2:SpanElement = new SpanElement()
+								aN2.text = bodys[iB2]
+								a2.addChild(aN2)
+								a2.href = bodys[iB2];
+								a2.setStyle("color","#0000FF");
+								aN2.setStyle ("textDecoration","none")
+								a2.textDecoration = "none"
+								p.addChild(a2);
+							}else {
+								var bd2:SpanElement = new SpanElement();
+								bd2.text = bodys[iB2];
+								p.addChild(bd2);
+							}
+						}
+					}else {
+						p.addChild(body);
+					}
+					if (readed) {
+						newEntry.setStyle("textAlpha",.65);
+					}
+					_tf.addChild(newEntry);
+					
+					if (msgDisplay)	msgDisplay.appendText("");
+					
+					_lastMsg.user = _from;
+					_lastMsg.date = _date;
+					_lastMsg.readed = readed
+				}catch (err:Error){
+					trace (err.getStackTrace());
+					
+				}
+			}
+			protected function onRemove(event:Event):void
+			{
+				try {
+					if (_stateTimer.running)_stateTimer.stop()
+					state = Message.STATE_ACTIVE;
+					
+					
+					room.addEventListener(RoomEvent.USER_JOIN,onRoom);
+					room.addEventListener(RoomEvent.USER_DEPARTURE,onRoom);
+					room.addEventListener(RoomEvent.USER_PRESENCE_CHANGE,onRoom);
+					room.addEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+					room.addEventListener(RoomEvent.GROUP_MESSAGE,onRoom);
+					room.addEventListener(RoomEvent.PRIVATE_MESSAGE,onRoom);
+					room.addEventListener(RoomEvent.ROOM_DESTROYED,onRoom);
+					room.addEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+					room.addEventListener(RoomEvent.USER_BANNED,onRoom);
+					
+					trace ("room close");
+				}catch (error:Error){
+					
+				}
+			}
+			
+			
+			
+		]]>
+	
+	</fx:Script>
+	<s:Group width="100%" left="0" right="0" bottom="0" top="0">
+		<s:layout>
+			<s:HorizontalLayout gap="1"/>
+		</s:layout>
+
+		<chat2:ChatRoomInfo id="_rosterInfo" creationComplete="init()" width="140" height="100%" top="2" bottom="0"/>
+		<s:VGroup top="2" bottom="0" left="0" right="0" gap="3" width="100%" height="100%">
+			<s:SkinnableContainer id="_incommingMsg" styleName="_incomingMessageBox"  width="100%"  height="100%">
+				<s:TextArea id="msgDisplay" left="0" right="0" top="0" bottom="3" borderVisible="false" textFlow="{_tf}" fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+							contentBackgroundAlpha="0.0"  editable="false"></s:TextArea>
+			</s:SkinnableContainer>
+			<s:SkinnableContainer id="_outgoingMsg" width="100%" height="62" styleName="_outgoingMessageBox">
+				<s:TextArea id="_outgoingMsgField" left="0" right="0" top="0" bottom="0" fontSize="{SettingsManager.CHAT_FONT_SIZE}"
+							color="#434343" contentBackgroundAlpha="0.0" 
+							paragraphSpaceAfter="0" keyDown="onKeyDown(event)"
+							paragraphSpaceBefore="0" whiteSpaceCollapse="preserve"/>
+			</s:SkinnableContainer>
+			
+		</s:VGroup>
+	</s:Group>
+</s:NavigatorContent>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false">
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+	
+	<!-- layer 1: shadow -->
+	<!--- @private -->
+	
+	
+	<!-- layer 2: fill -->
+	<!--- @private -->
+	<s:Rect id="fill" left="0" right="0" top="0" bottom="0" radiusX="2" radiusY="2">
+		
+		<!--s:fill>
+		<s:LinearGradient rotation="90">
+		<s:GradientEntry color="0xf7f7f0" 
+		color.selected="0x686868"
+		color.hovered = "0xf0efe4"  />
+		<s:GradientEntry color="0xebeae3" 
+		color.hovered = "0xfafaf0"
+		color.selected="0x222222"  />
+		</s:LinearGradient>
+		</s:fill-->
+		
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xf7f7f0" 
+								 color.selected="0x627ea0"
+								 color.hovered = "0xf0efe4"  />
+				<s:GradientEntry color="0xebeae3" 
+								 color.hovered = "0xeaeae0"
+								 color.selected="0x2e405a"  />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	
+	
+	<!-- layer 8: text -->
+	<!--- @copy spark.components.supportClasses.ButtonBase#labelDisplay -->
+	<s:Label text="{data.label}" id="labelDisplay"
+			 textAlign="left"
+			 verticalAlign="middle"
+			 maxDisplayedLines="1"
+			 verticalCenter="1"
+			 color="0x76a2c6"
+			 color.selected="0xffffff"
+			 left="8" right="26" >
+	</s:Label>
+	
+</s:ItemRenderer>

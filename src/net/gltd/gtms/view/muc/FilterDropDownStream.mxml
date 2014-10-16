@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** FilterDropDown.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_contacts_plugin 
+*	 Created: Sep 12, 2012 
+* 
+*
+--> 
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" >
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.muc.UIEvent;
+			
+			import mx.collections.ArrayCollection;
+			
+			import spark.events.IndexChangeEvent;
+			
+			public static const	FILTER_ALL			:String = "ALL",
+								FILTER_SUBSCRIBED	:String = "SUBSCRIBED",
+								FILTER_UNSUBSCRIBED	:String = "UNSUBSCRIBED";
+			
+			[Bindable]
+			public var dp:ArrayCollection =  new ArrayCollection([{label:"All",value:FILTER_ALL},{label:"Subscribed",value:FILTER_SUBSCRIBED},{label:"Unsubscribed",value:FILTER_UNSUBSCRIBED}]); 
+			
+			protected function _showList_changeHandler(event:IndexChangeEvent):void
+			{
+					var uev:UIEvent = new UIEvent(UIEvent.EVENT_FILTER_CHANGED);
+					uev.filterValue = _showList.selectedItem.value;
+					dispatchEvent(uev);
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Metadata>
+		
+	</fx:Metadata>
+	<s:DropDownList 
+		itemRenderer="net.gltd.gtms.view.SmallDropDownIR" styleName="small"
+		id="_showList" x="0" width="105" fontSize="9" change="_showList_changeHandler(event)" creationComplete="_showList_changeHandler(null)" dataProvider="{dp}" selectedIndex="0" />
+	
+</s:Group>

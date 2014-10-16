@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** MainTabs.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.1 
+*	 Created: Jun 11, 2012 
+* 
+*
+--> 
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  width="100%"
+		
+		  xmlns:parsley="http://www.spicefactory.org/parsley" xmlns:utils="net.gltd.gtms.view.utils.*" xmlns:view="net.gltd.gtms.view.*">
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.im.MainTabsManager;
+			[Inject][Bindable]
+			public	var	manager:MainTabsManager;
+			
+			protected function _buttonsContainer_addedHandler(event:Event):void
+			{
+				_buttonsContainer.height=_la.rowCount*34;
+			}
+			
+		]]>
+	</fx:Script>
+	 	
+	<s:Group left="0" right="68" id="_buttonsContainer" height="{_la.rowCount*34}" added="_buttonsContainer_addedHandler(event)">
+
+		<s:layout>
+			<s:TileLayout verticalGap="4" horizontalGap="4" horizontalAlign="left" orientation="rows"  id="_la" />
+		</s:layout>
+	
+	
+	
+	<!--view:MainTab id="editProfile"
+					includeInLayout="true"
+					buttonMode="true"
+					icon="@Embed('../assets/skins/main_tabs_ico/main_Edit_Profile.png')"
+					toolTip="Edit Profile" />
+
+	<view:MainTab id="addContact"
+					includeInLayout="true"
+					styleName="mainMenu" buttonMode="true"
+					icon="@Embed('../assets/skins/main_tabs_ico/main_add_Contact.png')"
+					toolTip="Add Contact" /-->
+
+		
+	</s:Group>
+	<s:Group right="0" id="_buttonsContainer2"  height="34" >
+		
+		<s:layout>
+			<s:HorizontalLayout gap="4"/>
+		</s:layout>
+		
+		
+		
+		<view:MainTab	id="settings" 
+						includeInLayout="true"
+						selected="false"
+						buttonMode="true"
+						icon="@Embed('../assets/skins/main_tabs_ico/utilities.png')" toolTip="Utilities" />
+		
+		<view:MainTab	id="logout" 
+						includeInLayout="true"
+						selected="false"
+						buttonMode="true"
+						icon="@Embed('../assets/skins/main_tabs_ico/main_Logout.png')" toolTip="Logout" right="0" />
+		
+		
+	</s:Group>
+	
+</s:SkinnableContainer>

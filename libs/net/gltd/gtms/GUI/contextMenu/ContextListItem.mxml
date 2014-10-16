@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" minWidth="120"
+				height="27" autoDrawBackground="false" click="onClick(event)" rollOver="onRollOver(event)">
+	
+	
+	
+
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected_sub" stateGroups="Glow" />
+		<s:State name="selected" stateGroups="Glow"  />
+	</s:states>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.events.ContextEvent;
+			[Bindable]
+			public	var nickname			:Object;
+			
+			[Bindable]
+			private	var _ico				:*;
+			
+			[Bindable]
+			private	var _ico2				:*;
+			
+			[Bindable]
+			private	var	_line				:Boolean
+			
+			[Bindable]
+			private	var	_subMenuEnabled		:Boolean;
+			
+			public override function set data (val:Object):void {
+			
+				super.data		= val;
+				try {
+					nickname		= val.label;
+					_line = val.lineBefore;
+					_ico = val.icon;
+					_subMenuEnabled = val.subMenu != null;	
+					if (val.enabled == false)this.enabled = false;
+					
+					_ico2 = val.icon2;
+				}catch (error:Error){
+				//	trace (error.getStackTrace());
+				}
+			}
+			
+			protected function onClick(event:MouseEvent):void
+			{
+				try {
+					var hasCallBack:Boolean = data.call();
+					if (!hasCallBack)return
+					this.parentApplication.close();
+				}catch (error:Error){
+				//	trace (error.getStackTrace());
+				}
+		
+			}
+			
+			protected function onRollOver(event:MouseEvent):void
+			{
+				var e:ContextEvent = new ContextEvent (ContextEvent.SHOW_SUBMENU);
+				e.contextItem = data as net.gltd.gtms.GUI.contextMenu.ContextMenuItem;
+				e.data = this.parentDocument.parent;
+				e.ir = this;
+				net.gltd.gtms.GUI.contextMenu.ContextMenu.ED.dispatchEvent( e );
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Rect	left="0" right="0" top="0" bottom="0"
+			height="27" width="100%"
+			alpha.normal="{styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundAlpha')}"
+			alpha.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundAlpha')}"
+			alpha.Glow="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundAlpha')}"
+	 
+			radiusX="2" radiusY="2" > 
+		<s:fill> 
+			<s:SolidColor
+				color.normal="{ styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundColor') }"
+				color.Glow="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"
+				color.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"/> 
+		</s:fill> 
+	</s:Rect>
+	<mx:HRule left="1" right="1" top="0" includeInLayout="{_line}" visible="{_line}" alpha="1" height="1" chromeColor="0x999999" shadowColor="0x333344" />
+	<s:HGroup left="7" verticalCenter="1" verticalAlign="middle" gap="2">
+		<s:Image source="{_ico}" includeInLayout="{_ico!=null}" visible="{_ico!=null}" maxHeight="16" smooth="true" id="ico" />
+		<s:Spacer width="1"/>
+		<s:Label text="{nickname}" fontWeight="normal" color="#ffffff" fontSize="11" />	
+	</s:HGroup>
+	
+	<s:Image source="{_ico2}" visible="{_ico2!=null}" includeInLayout="{_ico2!=null}" right="{18-Number(!_subMenuEnabled)*12}" verticalCenter="0"  maxHeight="18" smooth="true" id="ico2" />
+	<s:Image source="/assets/right_arrow.png" visible="{_subMenuEnabled}" includeInLayout="{_subMenuEnabled}" right="8" verticalCenter="0" id="submenu_arrow" />
+	
+	
+</s:ItemRenderer>

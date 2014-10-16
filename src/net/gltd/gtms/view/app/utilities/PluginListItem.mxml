@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" height="31">
+	
+	<fx:Script>
+		<![CDATA[
+			public override function set data(val:Object):void {
+				super.data = val;				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+	
+	<s:Rect	left="0" right="0" top="0" bottom="0" 
+			alpha.normal="{styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundAlpha')}"
+			alpha.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundAlpha')}"
+			alpha.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundAlpha')}"> 
+		<s:fill> 
+			<s:SolidColor
+				color.normal="{ styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundColor') }"
+				color.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundColor')}"
+				color.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"/> 
+		</s:fill> 
+	</s:Rect> 
+	<s:Image	source="{data.ico}" smooth="true"
+				height="28" left="2" verticalCenter="0"	/>
+	<s:Label text="{data.label}" left="36"	verticalCenter="0"
+			 styleName="listItemrendererText"
+			 styleName.hovered="listItemrendererTextHover"
+			 styleName.selected="listItemrendererTextSelected" />
+	
+</s:ItemRenderer>

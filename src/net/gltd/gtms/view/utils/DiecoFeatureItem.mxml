@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx" width="100%"
+				height="27"
+				autoDrawBackground="false"
+				doubleClick="itemrenderer1_doubleClickHandler(event)">
+	
+	
+	
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.DiscoBrowserEvents;
+			
+			import org.igniterealtime.xiff.data.disco.DiscoFeature;
+			[Bindable]
+			public var fieldsEnabled:Boolean;
+			public override function set data(val:Object):void {
+				fieldsEnabled = false;
+				super.data = val;
+				try {
+					label = val.varName;
+					//if (val is String || val == null || val.label == null)return;
+					//label = val.label;
+					
+				}catch (error:Error){}
+			}
+			public override function set label(s:String):void {
+				super.label = s;
+				if (label.indexOf('http') != 0)fieldsEnabled = true;
+			}
+			
+			protected function itemrenderer1_doubleClickHandler(event:MouseEvent):void
+			{
+				if (!fieldsEnabled)return;
+				this.owner.dispatchEvent( new DiscoBrowserEvents(DiscoBrowserEvents.FIELD_ITEM_CLICK,data) );
+			}
+			
+		]]>
+	</fx:Script>
+
+	
+	<s:Rect	left="0" right="0" top="0" bottom="0"  height="27" width="100%" 
+			alpha.normal="{styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundAlpha')}"
+			alpha.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundAlpha')}"
+			alpha.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundAlpha')}"> 
+			
+		<s:fill> 
+			<s:SolidColor 
+				color.normal="{ styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundColor') }"
+				color.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundColor')}"
+				color.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"/> 
+		</s:fill> 
+	</s:Rect>     
+	<s:Label text="{label}" verticalCenter="0" left="10" styleName="listItemrendererText"
+			 styleName.hovered="listItemrendererTextHover"
+			 styleName.selected="listItemrendererTextSelected" 
+			 
+			/>
+	<s:Image source="@Embed('../assets/rightarrow.png')" right="4" verticalCenter="0" buttonMode="true" includeInLayout="{fieldsEnabled}" visible="{fieldsEnabled}" click="itemrenderer1_doubleClickHandler(event)" />
+	
+</s:ItemRenderer>

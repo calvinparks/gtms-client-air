@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					icon="{_ico}"
+					label="{_label}"
+					addedToStage="init(event)" xmlns:utils="net.gltd.gtms.view.utils.*" xmlns:view="net.gltd.gtms.view.*"
+					
+					>
+
+	
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.model.dataHolder;
+			
+			import org.igniterealtime.xiff.events.IncomingDataEvent;
+			import org.igniterealtime.xiff.events.OutgoingDataEvent;
+			[Bindable]
+			[Embed(source="../assets/skins/main_tabs_ico/cinsole.png")]
+			private var _ico:Class;
+			
+			[Bindable]
+			public var _label:String = "Console";
+			
+			[Bindable]
+			private var _in:Boolean = true;
+			[Bindable]
+			private var _out:Boolean = false;
+			[Bindable]
+			private	var	_autoScroll:Boolean = false;
+			
+			protected function init(event:Event):void
+			{
+				dataHolder.getInstance().connection.addEventListener(Event.INIT,initConnectionListeners);
+				initConnectionListeners();
+			}
+			private function initConnectionListeners(event:Event=null):void {
+				dataHolder.getInstance().connection.connection.addEventListener(IncomingDataEvent.INCOMING_DATA,onIncomming,false,0,true);
+				dataHolder.getInstance().connection.connection.addEventListener(OutgoingDataEvent.OUTGOING_DATA,onOutgoing,false,0,true);
+				
+			}
+		
+			private function onOutgoing(d:OutgoingDataEvent):void {
+				try {
+					if (!_out)return
+					if (_display==null)return;
+					var s:String = d.data.toString();
+					if (s==null || s.length ==0)return;
+					try {
+						s = new XML(s).toString();
+					}catch (err:Error){}
+					if (s.length ==0)return;
+					_display.text+=("-Outgoing:\n"+s+ "\n\n" );
+					if (_autoScroll)_display.appendText("");
+					
+					s=null;
+				}catch (error:Error){
+					trace ("error out:",d.data.toString())
+				}
+			}
+			private function onIncomming(d:IncomingDataEvent):void {
+				try {
+					if (!_in)return
+					if (_display==null)return;
+					var s:String = d.data.toString();
+					var displayText:String;
+					if (s==null || s.length ==0)return;
+					try {
+						var __xml:XML = new XML(s);
+						
+						if (!__xml || __xml.length == 0){
+							displayText = s
+						}else {
+							displayText = __xml;
+						}
+					
+						
+					}catch (err:Error){
+						trace ("error consoe")
+					}
+					if (!displayText)displayText=d.data.toString();	
+					_display.text+=("-Incoming:\n"+displayText+ "\n\n" );
+					
+					
+					if (_autoScroll)_display.appendText("");
+					s=null;
+				}catch (error:Error){
+					trace ("error IN:",d.data.toString())
+				}
+			}
+			private var searchString:String;
+			private var startIndex:int = 0;
+			private var startIndexes:Array = [];
+			
+			protected function searchFunction(str:String):void {
+				if (searchString != str){
+					startIndex = 0;
+					startIndexes = [];
+				}
+				var ind:int = _display.text.slice(startIndex,_display.text.length).indexOf(str);
+				searchString = str;
+				if (ind == -1)return;
+				
+				_display.selectRange(ind+startIndex, startIndex+ind+str.length);
+				_display.scrollToRange(startIndex+ind, startIndex+ind+str.length);
+				
+			}
+			protected function onClear(event:MouseEvent):void
+			{
+				_searchBar.srchStr.text = "";
+				_display.text = "";
+				searchString = "";
+				startIndex = 0;
+				startIndexes =[]
+
+			}
+			
+			protected function onCopy(event:MouseEvent):void
+			{
+				System.setClipboard(_display.text)
+			}
+			
+			
+			protected function onPrev(event:MouseEvent):void
+			{
+				if (startIndexes.length > 0 && startIndex == startIndexes[startIndexes.length-1]){
+					startIndex = startIndexes.pop();
+				}
+				if(startIndexes.length>0){
+					startIndex = startIndexes.pop()
+				}else {
+					startIndex = 0;
+				}
+				searchFunction(searchString);
+			}
+			
+			protected function onNext(event:MouseEvent):void
+			{
+				startIndex = _display.selectionActivePosition;
+				startIndexes.push(startIndex);
+				searchFunction(searchString);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	<s:TextArea id="_display" left="0" right="0" top="40" bottom="40" editable="false" styleName="_console" 
+				selectionHighlighting="always"/>
+	<s:HGroup top="6" left="9" right="6" gap="5" verticalAlign="middle" width="100%">
+		<s:CheckBox label="Incoming" id="_incoming" selected="@{_in}"	/>
+		<s:Spacer width="1"/>
+		<s:CheckBox label="Outgoing" id="_outgoing" selected="@{_out}" />
+		<s:Spacer width="5"/>
+		<view:SearchBar searchFunction="{searchFunction}" id="_searchBar"/>
+		<s:Button label='prev.' click="onPrev(event)" />
+		<s:Button label='next' click="onNext(event)" />
+	</s:HGroup>
+	
+	<s:CheckBox label="Scroll Automatically" id="_ap" selected="@{_autoScroll}" left="9" bottom="11" />
+	<s:HGroup bottom="7" right="6" gap="4" >
+		<s:Button label=" Copy to Clipboard " click="onCopy(event)"/>
+		<s:Button label=" Clear Console " click="onClear(event)" />	
+	</s:HGroup>
+	
+</s:NavigatorContent>

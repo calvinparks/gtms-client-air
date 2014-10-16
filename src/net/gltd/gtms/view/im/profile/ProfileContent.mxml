@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** ProfileContent.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 24, 2012 
+* 
+*
+--> 
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		 creationComplete="preInit(event)"
+		 >
+
+	
+	<fx:Declarations>
+		<s:DropShadowFilter angle="47" blurX="2" blurY="2" alpha=".3" distance="1" color="#000000" id="_ds"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[ 
+			import net.gltd.gtms.model.im.AvatarModel;
+			
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.events.VCardEvent;
+			import org.igniterealtime.xiff.vcard.VCard;
+			import org.igniterealtime.xiff.vcard.VCardAddress;
+			import org.igniterealtime.xiff.vcard.VCardName;
+			import org.igniterealtime.xiff.vcard.VCardOrganization;
+			import org.igniterealtime.xiff.vcard.VCardPhoto;
+			import org.igniterealtime.xiff.vcard.VCardTelephone;
+			
+			
+			[Bindable] public	var editable	:Boolean = true;
+			[Bindable] private	var vC			:VCard;
+			
+			[Bindable] private	var firstName	:String = "";
+			[Bindable] private	var middleName	:String = "";
+			[Bindable] private	var lastName	:String = "";
+			[Bindable] private	var nick		:String = "";
+			[Bindable] private	var email		:String = "";
+			
+			[Bindable] private	var company		:String = "";
+			[Bindable] private	var street		:String = "";
+			[Bindable] private	var city		:String = "";
+			[Bindable] private	var state		:String = "";
+			[Bindable] private	var code		:String = "";
+			[Bindable] private	var country		:String = "";
+			
+			[Bindable] private	var jobtitle	:String = "";
+			[Bindable] private	var departament	:String = "";
+			
+			[Bindable] private	var phone		:String = "";
+			[Bindable] private	var mobile		:String = "";
+			[Bindable] private	var web			:String = "";
+			
+			[Bindable] private	var streetHome	:String = "";
+			[Bindable] private	var cityHome	:String = "";
+			[Bindable] private	var stateHome	:String = "";
+			[Bindable] private	var codeHome	:String = "";
+			[Bindable] private	var countryHome	:String = "";
+			[Bindable] private	var phoneHome	:String = "";
+			[Bindable] private	var mobileHome	:String = "";
+			
+			public				var	jid			:UnescapedJID;
+			private				var fileRef		:FileReference;
+			[Bindable]
+			private				var am			:AvatarModel = new AvatarModel();
+			private				var myAvatar	:AvatarModel;
+			
+			public function init(vcard:VCard, avatar:AvatarModel=null):void {
+				vcard.addEventListener(VCardEvent.LOADED,onLoaded);
+				myAvatar = avatar;
+				vC = vcard;
+				if (vcard.name){
+					firstName = vcard.name.given;
+					middleName = vcard.name.middle;
+					lastName = vcard.name.family;
+				}
+				nick = vcard.nickname;
+				email = vcard.email;
+				if (vcard.organization!=null){
+					company = vcard.organization.name;
+					departament = vcard.organization.unit;
+				}
+				if (vcard.workAddress != null){
+					street		= vcard.workAddress.street;
+					city		= vcard.workAddress.locality;
+					state		= vcard.workAddress.region;
+					code		= vcard.workAddress.postalCode;
+					country 	= vcard.workAddress.country;
+				}
+				if (vcard.homeAddress != null){
+					streetHome	= vcard.homeAddress.street;
+					cityHome	= vcard.homeAddress.locality;
+					stateHome	= vcard.homeAddress.region;
+					codeHome	= vcard.homeAddress.postalCode;
+					countryHome = vcard.homeAddress.country;
+				}
+			
+				if (vcard.workTelephone != null){
+					mobile 		= vcard.workTelephone.cell;
+					phone		= vcard.workTelephone.voice;
+				}
+				if (vcard.homeTelephone != null){
+					mobileHome	= vcard.homeTelephone.cell;
+					phoneHome	= vcard.homeTelephone.voice;
+				}
+				jobtitle	= vcard.title;
+				web			= vcard.url;
+				/*if (avatar != null){
+					am = avatar;
+					am.addEventListener(Event.COMPLETE,onAvatarLoaded);
+					am.add(am.byteSource);
+				}else {
+					
+				}*/
+				am.addEventListener(Event.COMPLETE,onAvatarLoaded);
+				if (vcard.photo != null){
+					am.add(vcard.photo.bytes);
+				}
+			}
+			public function save():VCard {
+				if (vC == null){
+					vC = new VCard();
+				}
+				if (vC.name == null && (firstName+lastName+middleName).length > 0){
+					vC.name = new VCardName();
+				}
+				if (vC.name != null){
+					vC.name.given	=	firstName;
+					vC.name.middle	=	middleName;
+					vC.name.family	=	lastName;
+				}
+				
+				vC.nickname		= nick
+				vC.email		= email;
+				if (vC.organization	==	null && (company+departament).length>0 ){
+					vC.organization = new VCardOrganization();
+				}
+				if (vC.organization != null){
+					vC.organization.name = company;
+					vC.organization.unit = departament;
+				}
+				
+				if (vC.workAddress == null && (street+city+state+code+country).length > 0){
+					vC.workAddress = new VCardAddress();
+				}
+				if (vC.workAddress != null){
+					vC.workAddress.street		=	street;
+					vC.workAddress.locality		=	city;
+					vC.workAddress.region		=	state;
+					vC.workAddress.postalCode	=	code;
+					vC.workAddress.country		=	country;
+				}
+				if (vC.homeAddress == null && (streetHome+cityHome+stateHome+codeHome+countryHome).length > 0){
+					vC.homeAddress = new VCardAddress();
+				}
+				if (vC.homeAddress != null){
+					vC.homeAddress.street		=	streetHome;
+					vC.homeAddress.locality		=	cityHome;
+					vC.homeAddress.region		=	stateHome;
+					vC.homeAddress.postalCode	=	codeHome;
+					vC.homeAddress.country		=	countryHome;
+				}
+				if (vC.workTelephone == null){
+					vC.workTelephone = new VCardTelephone();
+				}
+				if (vC.workTelephone != null){
+					vC.workTelephone.cell		=	mobile;
+					vC.workTelephone.voice		=	phone;
+				}
+				if (vC.homeTelephone == null){
+					vC.homeTelephone = new VCardTelephone();
+				}
+				if (vC.homeTelephone != null){
+					vC.homeTelephone.cell		=	mobileHome;
+					vC.homeTelephone.voice		=	phoneHome;
+				}
+				vC.title	=	jobtitle;
+				vC.url		= 	web;
+				
+				if (myAvatar!=null)myAvatar.add(am.byteSource);
+			
+				return vC;
+				
+				
+			}
+			private function onLoaded(event:VCardEvent):void {
+				init(event.vcard);
+			}
+			protected function onAvaterEdit(event:MouseEvent):void
+			{
+				var arr:Array = [];
+				arr.push(new FileFilter("Images", ".gif;*.jpeg;*.jpg;*.png"));
+				fileRef.browse(arr);
+				
+			}
+			private function fileRef_select(event:Event):void {
+				fileRef.load();
+			}
+			private function fileRef_progress(event:ProgressEvent):void {
+			}
+			private function fileRef_complete(event:Event):void {
+				am.add(fileRef.data);
+			}
+			private function onAvatarLoaded(event:Event):void {
+			//_avatar.source = am.bmpData;
+				vC.photo = new VCardPhoto();
+				vC.photo.type = "image/jpg";
+				vC.photo.bytes = am.byteSource;
+				
+			}
+			
+			protected function preInit(event:FlexEvent):void
+			{
+				fileRef = new FileReference();
+				fileRef.addEventListener(Event.SELECT, fileRef_select);
+				fileRef.addEventListener(ProgressEvent.PROGRESS, fileRef_progress);
+				fileRef.addEventListener(Event.COMPLETE, fileRef_complete);
+				 
+			}
+		]]>
+	</fx:Script>
+	
+	
+
+		<mx:ViewStack color="#ffffff"
+			top="27" left="0" right="0" bottom="35" id="_stacks"
+			backgroundColor="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" 
+			borderColor="#2a3d57" borderVisible="false" borderStyle="solid">
+			<s:NavigatorContent label="Personal" >
+				<s:Group buttonMode="true" width="100%" left="15" right="15" click="onAvaterEdit(event)" >
+					<s:BitmapImage scaleMode="zoom"
+								   width="57" height="57"
+								   horizontalAlign="center" verticalAlign="middle" maxHeight="60" source="{am.foto}"  id="_avatar" right="0" top="10" smoothingQuality="high" smooth="true"  />
+				</s:Group>
+				
+				<s:Spacer height="8"/>
+				<s:HGroup horizontalAlign="right" left="15" top="80" right="15">
+					
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						
+						<s:Label text="First Name" verticalAlign="middle" />
+						<s:Label text="Middle Name" verticalAlign="middle" />
+						<s:Label text="Last Name" verticalAlign="middle" />
+						<s:Label text="Nickname" verticalAlign="middle" />
+						<s:Label text="Email Address" verticalAlign="middle" />
+					</s:VGroup>
+					<s:Spacer width="7"/>
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						<s:TextInput editable="{editable}" text="@{firstName}" id="_firstName" />
+						<s:TextInput editable="{editable}" text="@{middleName}" id="_middleName" />
+						<s:TextInput editable="{editable}" text="@{lastName}" id="_lastName" />
+						<s:TextInput editable="{editable}" text="@{nick}" id="_nick" />
+						<s:TextInput editable="{editable}" text="@{email}" id="_email" />
+					</s:VGroup>
+					
+				</s:HGroup>
+				
+				
+			</s:NavigatorContent>
+			<s:NavigatorContent label="Business"  >
+				
+				
+				<s:HGroup horizontalAlign="right" left="15" top="15" right="15">
+					
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						
+						<s:Label text="Company" verticalAlign="middle" />
+						<s:Label text="Street" verticalAlign="middle" />
+						<s:Label text="City" verticalAlign="middle" />
+						<s:Label text="State/Province" verticalAlign="middle" />
+						<s:Label text="Postal Code" verticalAlign="middle" />
+						<s:Label text="Country" verticalAlign="middle" />
+						<s:Label text="Job Title" verticalAlign="middle" />
+						<s:Label text="Departament" verticalAlign="middle" />
+						<s:Label text="Phone" verticalAlign="middle" />
+						<s:Label text="Mobile" verticalAlign="middle" />
+						<s:Label text="Web Page" verticalAlign="middle" />
+						
+					</s:VGroup>
+					<s:Spacer width="7"/>
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						<s:TextInput editable="{editable}" text="@{company}" id="_company" />
+						<s:TextInput editable="{editable}" text="@{street}" id="_street" />
+						<s:TextInput editable="{editable}" text="@{city}" id="_city" />
+						<s:TextInput editable="{editable}" text="@{state}" id="_state" />
+						<s:TextInput editable="{editable}" text="@{code}" id="_code" />
+						<s:TextInput editable="{editable}" text="@{country}" id="_country" />
+						<s:TextInput editable="{editable}" text="@{jobtitle}" id="_jobtitle" />
+						<s:TextInput editable="{editable}" text="@{departament}" id="_departament" />
+						<s:TextInput editable="{editable}" text="@{phone}" restrict="0-9,+" id="_phone" />
+						<s:TextInput editable="{editable}" text="@{mobile}" restrict="0-9,+" id="_mobile" />
+						<s:TextInput editable="{editable}" text="@{web}" id="_web" />
+					</s:VGroup>
+					
+				</s:HGroup>
+				
+				
+			</s:NavigatorContent>
+			<s:NavigatorContent label="Home" >
+				<s:HGroup horizontalAlign="right" left="15" top="15" right="15">
+					
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						<s:Label text="Street" verticalAlign="middle" />
+						<s:Label text="City" verticalAlign="middle" />
+						<s:Label text="State/Province" verticalAlign="middle" />
+						<s:Label text="Postal Code" verticalAlign="middle" />
+						<s:Label text="Country" verticalAlign="middle" />
+						<s:Label text="Phone"  verticalAlign="middle" />
+						<s:Label text="Mobile" verticalAlign="middle" />
+						
+					</s:VGroup>
+					<s:Spacer width="7"/>
+					<s:VGroup gap="5" horizontalAlign="right" rowHeight="28"
+							  variableRowHeight="false" verticalAlign="middle">
+						
+						<s:TextInput editable="{editable}" text="@{streetHome}" id="_streetHome" />
+						<s:TextInput editable="{editable}" text="@{cityHome}" id="_cityHome" />
+						<s:TextInput editable="{editable}" text="@{stateHome}" id="_stateHome" />
+						<s:TextInput editable="{editable}" text="@{codeHome}" id="_codeHome" />
+						<s:TextInput editable="{editable}" text="@{countryHome}" id="_countryHome" />
+						<s:TextInput editable="{editable}" text="@{phoneHome}" id="_phoneHome" restrict="0-9,+" />
+						<s:TextInput editable="{editable}" text="@{mobileHome}" id="_mobileHome" restrict="0-9,+" />
+					</s:VGroup>
+					
+				</s:HGroup>
+			</s:NavigatorContent>
+		</mx:ViewStack>
+	<!--   skinClass="com.gtms.skins.utils.ChatTabBarSkin"  -->
+	<s:TabBar id="_tabs" left="8" top="0" height="27" dataProvider="{_stacks}"
+		
+			/>
+</s:Group>
+
+
+

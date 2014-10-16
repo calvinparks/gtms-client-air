@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				height="26" width="100%" autoDrawBackground="false" xmlns:utils="net.gltd.gtms.view.im.utils.*">
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.im.RosterItemVO;
+			
+			[Bindable]
+			private var led:Class;
+			
+			[Bindable]
+			private var r:RosterItemVO;
+			public var jid:UnescapedJID;
+			
+			override public function set data(obj:Object):void {
+				if (obj==null)return
+				try {
+					var oc:uint = 0;
+					r = obj.roster;
+					jid = obj.jid;
+					led  = ShowStatusManager.getShowIco(r);
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+
+	<s:Rect	left="0" right="0" top="0" bottom="0"  height="27" width="100%" 
+			alpha.normal="{styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundAlpha')}"
+			alpha.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundAlpha')}"
+			alpha.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundAlpha')}"> 
+		
+		<s:fill> 
+			<s:SolidColor 
+				color.normal="{ styleManager.getMergedStyleDeclaration('.listItemrenderer').getStyle('backgroundColor') }"
+				color.selected="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundColor')}"
+				color.hovered="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"/> 
+		</s:fill> 
+	</s:Rect>     
+	<s:HGroup left="10" right="10" styleName="listItemrendererText"
+			  styleName.hovered="listItemrendererTextHover"
+			  styleName.selected="listItemrendererTextSelected" 
+			  verticalCenter="2" >
+		<utils:ShowLed showLed="{led}" _top="{-2}"/> 
+		<s:Label id="_name" creationComplete="{_name.text=r.nickname}" verticalCenter="0"  />
+		<s:Label text=" - " left="25" verticalCenter="0" />
+		<s:Label id="_stat" creationComplete="{_stat.text=r.status}" maxHeight="{24}" verticalCenter="0" left="25" />
+	</s:HGroup>
+	
+	
+</s:ItemRenderer>

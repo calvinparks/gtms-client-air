@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?><!-- 
+** ContactItemRenderer.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 14, 2012 
+* 
+*
+-->
+<contactList:ContactItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:contactList="net.gltd.gtms.view.im.contactList.*"
+				creationComplete="init()"
+				autoDrawBackground="false"
+				width="100%" xmlns:utils="net.gltd.gtms.view.im.utils.*">
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.view.im.utils.ShowLed;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.controls.Spacer;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Label;
+			
+			private var statusMsg		:Label = new Label();
+			private var show			:ShowLed = new ShowLed();
+			private var spacer			:Spacer = new Spacer();
+			public override function set data(val:Object):void {
+				try {
+					if (val == null || val.roster == null)return;
+					super.data = val;
+					//statusMsg.text = "- "+val.roster.status;
+					if (val.mark){
+						//show.showLed =
+					//	data.show =  ShowStatusManager.getIco("immessage");
+						__label.setStyle("fontWeight","bold");
+						statusMsg.setStyle("fontWeight","bold");
+					}else{
+						
+						
+					/*	if (val.composing){
+							show.showLed = ShowStatusManager.getIco("imcomposing");
+						}else {
+							show.showLed = ShowStatusManager.getShowIco(val.roster);
+						}*/
+						if(__label!=null)__label.setStyle("fontWeight","normal")
+						if(statusMsg!=null)statusMsg.setStyle("fontWeight","normal");
+					}
+					
+				}catch (error:Error){}
+				
+							
+			}
+			public function init():void {
+				statusMsg.percentWidth = 95;
+				statusMsg.maxHeight = 25;
+				statusMsg.left = 3;
+				statusMsg.right = 3;
+				statusMsg.styleName = "_contactItemStatus";
+				
+				_cont.addElement(statusMsg);
+				_cont.addElementAt(show,1);
+				spacer.width = 1;
+				_cont.addElementAt(spacer,2);
+				BindingUtils.bindSetter(bindShow,data,"show")
+			//	BindingUtils.bindProperty(data,"show",show,"showLed");
+				BindingUtils.bindProperty(statusMsg,"text",data,"status");
+				
+			
+			}
+			private function bindShow(c:Class):void {
+				this.show.showLed = c;
+			}
+			
+			
+		]]>
+	</fx:Script>
+<!--
+
+	<s:Image right="2" verticalCenter="-1" buttonMode="true" id="videoIco" name="videoIco"  visible="{hasCamera}" includeInLayout="{hasCamera}"
+			 source="@Embed('assets/camera.png')" smooth="true"  />
+	<s:Image verticalCenter="-1" buttonMode="true" id="transportIco" name="transportIco"  includeInLayout="{isGateway}" visible="{isGateway}"
+			 smooth="true"  />
+	
+	-->
+	
+</contactList:ContactItemRenderer>

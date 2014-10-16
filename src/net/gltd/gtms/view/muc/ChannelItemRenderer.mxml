@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="true" xmlns:utils="net.gltd.gtms.view.im.utils.*"
+				rollOver="onTT(event)"
+				rollOut="onTT(event)"
+				mouseDown="onTT(event)"
+				doubleClick="clickEvent(event)"
+				rightClick="showContextMenu(event)"
+				width="100%" height="49"
+				
+				>
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected" />
+		<s:State name="hovered" />
+		<s:State name="sel" />
+		<s:State name="glow" basedOn="normal" />
+	</s:states>
+	<fx:Declarations>
+		<s:DropShadowFilter color="#FFFFFF" alpha=".8" id="_icoShadow" distance="0" blurX="0" blurY="0"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.events.muc.ChannelItemEvent;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.model.muc.StreamModel;
+			
+			import mx.events.ToolTipEvent;
+			
+			import spark.components.supportClasses.TextBase;
+			
+			
+			protected var tO:uint;
+			
+			private function onToolTip(event:ToolTipEvent):void {
+				var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+				e.id = data.id;
+				e.toolTip = event;
+				dispatchEvent(e);
+				
+			}
+			private function clickEvent(event:MouseEvent):void
+			{ 
+				try {
+					if (data.clickFunction!=null)data.clickFunction(event);
+				}catch (error:Error){}
+				
+				
+			}
+			protected function onTT(event:MouseEvent):void
+			{
+				try {
+					var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+					e.id = data.id;
+					e.mouseEvent = event;
+					if (event.type == MouseEvent.ROLL_OVER){
+						tO = setTimeout(dispatchEvent,1700,e);
+						return;
+					}
+					
+					dispatchEvent(e);
+					clearTimeout(tO);
+				}catch (error:Error){
+					
+				}
+				
+			}
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+			
+		
+			
+			protected function doFollow(event:MouseEvent):void
+			{
+				var e:ChannelItemEvent = new ChannelItemEvent(ChannelItemEvent.EVENT_FOLLOW);
+				e.item = data;
+				this.owner.dispatchEvent(e);
+			}
+			
+			protected function doUnfollow(event:MouseEvent):void
+			{
+				var e:ChannelItemEvent = new ChannelItemEvent(ChannelItemEvent.EVENT_UNFOLLOW);
+				e.item = data;
+				this.owner.dispatchEvent(e);
+			}
+			
+			protected function showContextMenu(event:MouseEvent):void
+			{
+				var e:ChannelItemEvent = new ChannelItemEvent(ChannelItemEvent.EVENT_SHOWCONTEXT);
+				e.item = data;
+				e.mouseEvent = event;
+				this.owner.dispatchEvent(e);
+			}
+		
+			protected function doFav(event:MouseEvent):void
+			{
+				var e:ChannelItemEvent = new ChannelItemEvent(ChannelItemEvent.EVENT_FAV);
+				e.item = data;
+				e.mouseEvent = event;
+				this.owner.dispatchEvent(e);
+			}
+			[Bindable]
+			private function get ownerName():String {
+				return this.owner.name;
+			}
+			private function set ownerName(s:String):void {
+				
+			}
+		]]>
+		
+	</fx:Script>
+		<s:SkinnableContainer width="100%" height="100%" 
+							  styleName="_contactItemRendererSkin"
+							  styleName.selected="_contactItemRendererSelectedSkin"
+							  styleName.hovered="_contactItemRendererHoveredSkin"
+							 
+							  >
+			<s:Group width="100%" 
+					 left="3" bottom="3" top="3" right="3">
+				<s:Image
+					left="2" top="2"
+					width="23" height="22"
+					id="_avatar" scaleMode="zoom"
+					verticalAlign="middle" horizontalAlign="left"
+					source="{data.avatar.foto}"
+					smooth="true" smoothingQuality="default" />
+				<s:Image source="@Embed('../assets/muc_icons/lock_small.png')" left="18" top="17" visible="{ !(data is StreamModel || data.locked==false) }" includeInLayout="{ !(data is StreamModel || data.locked==false) }"/>
+				<s:BitmapImage
+					left="5" bottom="2"
+					width="13" height="13"
+					id="_typeIco" scaleMode="zoom"
+					verticalAlign="middle" horizontalAlign="center"
+					source="{data.icon}"  filters.selected="{[_icoShadow]}"
+					smooth="true" smoothingQuality="default" />
+				<s:Image 
+					right="2"  bottom="2"
+					width="18" height="11"
+					id="_favIco" scaleMode="zoom"
+					verticalAlign="middle" horizontalAlign="center"
+					source="{data.favoriteIcon}"
+					click="doFav(event)"
+					smooth="true" smoothingQuality="default" filters.selected="{[_icoShadow]}"
+					/>
+
+				<s:Label text="{data.label}" maxDisplayedLines="1" left="29" top="3" right="20"/>
+				<s:Label text="{data.info}"
+						 styleName="_contactItemStatus"
+						 styleName.selected="_contactItemStatusSelected"
+						 left="29" right="50" top="19" maxDisplayedLines="1"
+						 />
+				<s:Button label="Subscribe"	right="1"	top="1"		enabled="true"		includeInLayout="{!(data is StreamModel || data.followed==true || ownerName != ChannelModel.KIND_CHANNEL)}"		visible="{!(data is StreamModel || data.followed==true || ownerName != ChannelModel.KIND_CHANNEL)}"	click="doFollow(event)"
+						  skinClass="net.gltd.gtms.view.muc.MucBlueButtonSkin"	color="#FFFFFF" width="55"
+						  />
+				<s:Button label="Unsubscribe" 	right="1"	top="1"		enabled="true"		includeInLayout="{!(data is StreamModel || data.followed==false || ownerName !=  ChannelModel.KIND_CHANNEL)}"		visible="{!(data is StreamModel || data.followed==false || ownerName != ChannelModel.KIND_CHANNEL)}"	click="doUnfollow(event)"
+						  skinClass="net.gltd.gtms.view.muc.MucButtonSkin"		color="#FFFFFF" width="55"
+						  />
+				
+				<!--s:Image source="@Embed('../assets/close_tab.png')"  right="5" top="5" visible="false" visible.hovered="{data is StreamModel}" includeInLayout="{data is StreamModel}" buttonMode="true"/-->
+
+					</s:Group>
+			
+			
+			<mx:HRule bottom="-1" height="1" width="100%"
+					  strokeColor="{styleManager.getMergedStyleDeclaration('._contactsList').getStyle('contentBackgroundColor')}"
+					  shadowColor="{styleManager.getMergedStyleDeclaration('._contactsList').getStyle('contentBackgroundColor')}"
+					  />
+		</s:SkinnableContainer>
+		
+	
+</s:ItemRenderer>

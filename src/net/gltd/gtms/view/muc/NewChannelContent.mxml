@@ -1,0 +1,660 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%" xmlns:utils="net.gltd.gtms.view.im.utils.*">
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Metadata>
+		[Event(name="onCreateNewChannel",type="net.gltd.gtms.events.muc.MUC_UI_Event")]
+		[ManagedEvents("onCreateNewChannel")]
+	</fx:Metadata>
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.muc.MUC_UI_Event;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.dataHolder;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.model.xmpp.DiscoItemModel;
+			import net.gltd.gtms.utils.CheckList;
+			import net.gltd.gtms.view.ListItem2;
+			import net.gltd.gtms.view.SearchBar;
+			import net.gltd.gtms.view.im.contactList.BuddyItemRenderer;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.UIComponent;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.data.Extension;
+			import org.igniterealtime.xiff.data.IQ;
+			import org.igniterealtime.xiff.data.forms.FormExtension;
+			import org.igniterealtime.xiff.data.muc.MUCOwnerExtension;
+			
+			import spark.components.Window;
+			import spark.events.IndexChangeEvent;
+			/// get fields from  <query xmlns='http://jabber.org/protocol/muc#owner'/>
+			
+			[Bindable]
+			private var _servicesData:ArrayCollection;
+			
+			[Bindable]
+			public	var	isInfo:Boolean = false;
+			
+			[Bindable]
+			public	var item:ChannelModel;
+			
+			[Bindable]
+			public	var	data:Object;
+			
+			public var myJID:EscapedJID;
+			
+			[Bindable]
+			private var roomconfig_maxusers_selected:int;
+			
+			[Bindable]
+			private var roomconfig_whois_selected:int;
+			
+			[Bindable]
+			private var roomconfig_allowpm_selected:int;
+			
+			[Bindable]
+			private var _saveLabel:String = "Create";
+			
+			
+			protected function scroller1_creationCompleteHandler(event:FlexEvent):void
+			{
+				(event.currentTarget as Scroller).setFocus();
+				
+				if (!isInfo){
+					roomconfig_maxusers_selected = 1;
+					roomconfig_whois_selected = 1;
+					roomconfig_allowpm_selected = 0;
+					return;
+				}else {
+					_saveLabel = "Update";
+					try {
+						if (item.room && item.room.active){
+							roominfo_subject.text  = item.room.subject;
+						}else {
+							for (var iui:uint = 0; iui< item.details.x.field.length;iui++){
+								if (item.details.x.field[iui]['label'] == "Subject"){
+									roominfo_subject.text  = item.details.x.field[iui]['value'];
+									break;
+								}
+							}
+						}
+					}catch (error:Error){
+						trace (error.getStackTrace())
+					}
+				}
+			
+			
+				
+				setTimeout(function():void {
+					var fieldmap:Object = {};
+					var i:int;
+					var objId:String; 
+					if (data.hasOwnProperty("error")){
+						return;
+					}
+					for (i = 0; i<data.query.x.field.length;i++){
+						try {
+							objId = (data.query.x.field[i]['var'] as String).split("#")[1];
+							var j:uint = 0;
+							do {
+								try {
+									if ( _extenstions.getElementAt(j++) == null) break;
+									if (objId == _extenstions.getElementAt(j)['id']){
+										if ( _extenstions.getElementAt(j) is TextInput ||  _extenstions.getElementAt(j) is ListInput) _extenstions.getElementAt(j)['text'] = data.query.x.field[i]['value'];
+										else if ( _extenstions.getElementAt(j) is RadioButton) _extenstions.getElementAt(j)['selected'] = Boolean(Number(data.query.x.field[i]['value']));
+										else if ( _extenstions.getElementAt(j) is CheckBox) _extenstions.getElementAt(j)['selected'] = Boolean(Number(data.query.x.field[i]['value']));
+										else if ( _extenstions.getElementAt(j) is DataGroup ||  _extenstions.getElementAt(j) is DropDownList){
+											var ac:ArrayCollection = _extenstions.getElementAt(j)['dataProvider'];
+											for (var k:uint = 0; k<ac.length; k++){
+												ac.getItemAt(k).selected = false;
+												if (data.query.x.field[i]['value'] is Array){
+													for (var o:uint = 0; o<data.query.x.field[i]['value'].length;o++){
+														if (String(ac.getItemAt(k).value) == String(data.query.x.field[i]['value'][o])){
+															ac.getItemAt(k).selected = true;
+															if (_extenstions.getElementAt(j) is DropDownList){
+																var vec7:Vector.<int> = new Vector.<int>();
+																vec7.push( k );
+																(_extenstions.getElementAt(j) as DropDownList).selectedIndices = vec7;
+															}
+															ac.refresh();
+//break;
+														}
+													}
+												}else {
+													if (String(ac.getItemAt(k).value) == String(data.query.x.field[i]['value'])){
+														ac.getItemAt(k).selected = true;
+														if (_extenstions.getElementAt(j) is DropDownList){
+															var vec:Vector.<int> = new Vector.<int>();
+															vec.push( k );
+														 	(_extenstions.getElementAt(j) as DropDownList).selectedIndices = vec;
+															roomconfig_maxusers_selected = 2;
+														}
+														ac.refresh();
+//break;
+													}
+												}
+											}
+											ac.refresh();
+											//_extenstions.getElementAt(j)['selected'] = Boolean(Number(data.query.x.field[i]['value']));
+										
+										}
+										
+									
+//break;
+									}
+								}catch (error:Error){
+								//	trace (error.getStackTrace());
+ break;
+								}
+							}while(true);
+						}catch (error:Error){
+						//	trace (error.getStackTrace());
+							//continue;
+						}
+						
+						
+				
+						
+					}
+				},50);
+				
+				
+			}
+			
+			
+			
+			public function set services( s : Vector.<DiscoItemModel> ):void {
+			
+				_servicesData = new ArrayCollection();
+				for (var i:uint = 0; i<s.length; i++){ 
+					_servicesData.addItem( {label:s[i].name+" ("+s[i].jid.bareJID+")", jid:s[i].jid} );
+				}
+			}
+			
+			[Bindable]
+			private var roomconfig_allowpm_data:ArrayCollection = new ArrayCollection([
+				{label:"Anyone",value:"anyone", selected:true},
+				{label:"Anyone with Voice",value:"participants"},
+				{label:"Moderators Only",value:"moderators"},
+				{label:"Nobody",value:"none"}
+				]);
+			[Bindable]
+			private var roomconfig_getmemberlist_data:ArrayCollection = new ArrayCollection([
+				{label:"Moderator",value:"moderator",selected:true},
+				{label:"Participant",value:"participant",selected:true},
+				{label:"Visitor",value:"visitor",selected:true}
+			]);
+			[Bindable]
+			private var roomconfig_presencebroadcast_data:ArrayCollection = new ArrayCollection([
+				{label:"Moderator",value:"moderator",selected:true},
+				{label:"Participant",value:"participant",selected:true},
+				{label:"Visitor",value:"visitor",selected:true}
+			]);
+			
+			
+			[Bindable]
+			private var roomconfig_whois_data:ArrayCollection = new ArrayCollection([
+				{label:"Moderators Only",value:"moderators"},
+				{label:"Anyone",value:"anyone"}
+			]);
+			[Bindable]
+			private var roomconfig_maxusers_data:ArrayCollection = new ArrayCollection([
+				{label:"10",value:10},
+				{label:"20",value:20},
+				{label:"30",value:30},
+				{label:"50",value:50},
+				{label:"100",value:100},
+				{label:"None",value:0}
+			])
+			
+			private var allJIDs:ArrayCollection = new ArrayCollection()
+			
+			protected function close_clickHandler(event:MouseEvent):void
+			{
+				this.parentApplication['close']();
+			}
+		
+			
+
+			
+			protected var wind:Window;
+			protected function addItemClick(input:ListInput,title:String,type:String=null):void
+			{
+				
+				//return function (event:MouseEvent=null):void {
+					try {
+						search_filter = "";
+						selectedList = {};
+						if (wind != null && wind.closed==false)wind.close();
+						
+						wind = dataHolder.getInstance().getWindow(title,true,"none",360,400,false,false,true,true);
+						
+						var dp:ArrayCollection = new ArrayCollection();
+						var tmpList:CheckList = new CheckList();
+						
+						var v:Vector.<int> = new Vector.<int>();
+						var i:uint;
+					
+						var my_domain:String;
+						if (servicesField.selectedItem != null && servicesField.selectedItem.hasOwnProperty("jid")){
+							my_domain = (servicesField.selectedItem.jid.domain as String).slice(servicesField.selectedItem.jid.domain.indexOf(".")+1,(servicesField.selectedItem.jid.domain as String).length);
+						}
+						for (i=0; i<buddiesHolder.getInstance().length; i++){
+							if (buddiesHolder.getInstance().getBuddy(i) is IMBuddyModel){
+								if (my_domain != null && (buddiesHolder.getInstance().getBuddy(i) as IMBuddyModel).roster.jid.domain != my_domain)continue;
+								 
+								dp.addItem(
+									{
+										label: buddiesHolder.getInstance().getBuddy(i)['roster']['nickname'] + " (" + buddiesHolder.getInstance().getBuddy(i)['roster']['jid'] + ")",
+										value: buddiesHolder.getInstance().getBuddy(i)['roster']['jid'] ,
+										data: buddiesHolder.getInstance().getBuddy(i),
+										id: buddiesHolder.getInstance().getBuddy(i).id
+									});
+								//if (input.text.indexOf(buddiesHolder.getInstance().getBuddy(i)['roster']['jid'].toString()) > -1)v.push( i );
+								if (input.dp.getItemIndexByID( buddiesHolder.getInstance().getBuddy(i)['roster']['jid'].toString() ) >-1)v.push( dp.length-1 );
+							}
+						}
+						tmpList.itemRenderer = new ClassFactory( BuddyItemRenderer );
+						
+					
+						
+						var searBar:SearchBar = new SearchBar();
+						searBar.searchFunction = searchFunction(tmpList);
+						wind['_container'].addElement(searBar);
+						
+						
+						tmpList.percentWidth = 100;
+						tmpList.percentHeight = 100;
+						tmpList.dataProvider = dp; 
+						dp.addEventListener(CollectionEvent.COLLECTION_CHANGE,onCollChange(tmpList));
+						//tmpList.addEventListener(IndexChangeEvent.CARET_CHANGE,onIndexChange);
+						tmpList.addEventListener(MouseEvent.MOUSE_DOWN,onIndexChange)
+						dp.filterFunction = filterFunction;
+						tmpList.setStyle("contentBackgroundColor", "#FFFFFF");
+						tmpList.setStyle("contentBackgroundAlpha", 1 );
+						
+						tmpList.selectedIndices = v;
+						
+						tmpList.left = tmpList.right = 0
+						tmpList.top = searBar.height + 1;
+						
+						var vl:VerticalLayout = new VerticalLayout();
+						vl.gap = 1;
+						tmpList.layout = vl; 
+						
+						wind['_container'].addElement(tmpList);
+						wind['_container'].bottom += 32;
+						
+						//	tmpList.addEventListener(ItemEvent.ITEM_CLICK,onIndexChange);
+						
+						var addBt:Button = new Button();
+						addBt.label = "Add";
+						addBt.right = 8;
+						addBt.bottom = 6;
+						wind.addElement( addBt );
+						addBt.addEventListener(MouseEvent.CLICK,onItemsAdded(input,tmpList));
+						
+					}catch (error:Error){
+						trace (error.getStackTrace());
+					}
+					
+					
+				//}
+			}
+			private var selectedList:Object = {};
+			private var search_filter:String = "";
+			
+			private function onIndexChange(e:MouseEvent):void {
+				try {
+					var obj:Object = e.target;
+					var id:String = e.target.parentDocument.data.id;
+					if (selectedList[id] != undefined) delete selectedList[id];
+					else selectedList[id] = true;
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+			}
+			private function onCollChange(list:CheckList):Function {
+				
+				return function (e:CollectionEvent=null):void {
+					var listData:ArrayCollection = list.dataProvider as ArrayCollection;
+					var selIts:Vector.<int> = new Vector.<int>;
+					
+					var i:uint
+					for (i = 0; i<listData.length; i++){
+						if ( selectedList [ (listData.getItemAt(i).id) ] == true) {
+							selIts.push(i);
+						}
+					}
+					list.selectedIndices = selIts;
+					
+				}
+			}
+			private function filterFunction(obj:Object):Boolean {
+				return (obj.label).toLowerCase().indexOf(search_filter) > -1
+			}
+			
+			
+			
+			//private var _selectedItems:Vector.<Object>;
+			private function searchFunction(list:CheckList):Function {
+				return function(str:String):void{
+					
+					
+					onCollChange(list)();
+					search_filter = str.toLowerCase();
+					if (search_filter.length < 1){
+						(list.dataProvider as ArrayCollection).filterFunction = null;
+					}else {
+						(list.dataProvider as ArrayCollection).filterFunction = filterFunction;
+					}
+					(list.dataProvider as ArrayCollection).refresh();
+					
+					setTimeout(onCollChange(list),10);
+					setTimeout(onCollChange(list),120);
+					setTimeout(onCollChange(list),500);
+				}
+			}
+			private function onItemsAdded(input:ListInput,list:CheckList):Function {
+				
+				return function (event:MouseEvent):void {
+					
+					//input.text = "";
+					var value:String;
+					var dn:String;
+					
+					for (var i:uint = 0; i<list.selectedItems.length; i++){
+						//if (list.selectedItems[i].hasOwnProperty('value'))value = list.selectedItems[i].value;
+						//else value = list.selectedItems[i].id;
+						if (list.selectedItems[i].hasOwnProperty('value')){
+							value = list.selectedItems[i].value;
+							dn =  list.selectedItems[i].data.nickname;
+						}
+						else {
+							value = list.selectedItems[i].id;
+							dn =  list.selectedItems[i].label;
+						}
+						input.addItem(value,dn);
+						//input.text += value;
+					//	if (i < list.selectedItems.length-1)input.text +=", ";
+					}
+					(event.currentTarget as Button).parentApplication['close']();
+					
+				}
+			}
+			
+			
+			
+			protected function create_clickHandler(event:MouseEvent):void
+			{
+ 
+				if (roomconfig_roomname.text == null || roomconfig_roomname.text.length == 0){
+					/// display error;
+					_scroller.verticalScrollBar.value = _scroller.verticalScrollBar.minimum;
+					roomconfig_roomname.setFocus();
+					return;
+				}
+				
+				if (roomconfig_passwordprotectedroom.selected && (roomconfig_roomsecret.text != confirm_roomconfig_roomsecret.text) ) {
+					_scroller.verticalScrollBar.value = _scroller.verticalScrollBar.minimum;
+					roomconfig_roomsecret.setFocus();
+					
+					return 
+				}
+				var mucOwnerExtension:MUCOwnerExtension = new MUCOwnerExtension();
+				
+				var formExtesion:FormExtension = new FormExtension();
+				formExtesion.type = "submit"
+				
+				var fieldmap:Object = {};
+				
+				var i:int = -1;
+				
+			
+				do {
+					i++;
+					try {
+						if ( _extenstions.getElementAt(i) == null) break;
+					}catch (error:Error){
+						break;
+					}
+					var el:*= _extenstions.getElementAt(i) as UIComponent;
+					if (el.hasOwnProperty("id")) {
+						if (el.id == null || el.id.indexOf("roomconfig") != 0) continue;
+						if (el is CheckBox || el is RadioButton){
+							fieldmap["muc#"+el.id] = [ Number(el.selected) ];
+						}else if (el is TextInput || el is ListInput){
+							if (el.id =="roomconfig_roomsecret" && !roomconfig_passwordprotectedroom.selected)continue;
+							else if (el.id == "roomconfig_roomadmins" || el.id == "roomconfig_roomowners"){						
+								if (el.text.length > 0)fieldmap["muc#"+el.id] = el.text.split (",");
+								else fieldmap["muc#"+el.id] = [];
+								if (el.id == "roomconfig_roomowners") fieldmap["muc#"+el.id].push(myJID.bareJID)
+							}else {
+								fieldmap["muc#"+el.id] = [ el.text ];
+							}
+						}else if (el is DropDownList){
+							if (!el.selectedItem)el.selectedIndex = 0;
+							fieldmap["muc#"+el.id] = [ el.selectedItem.value ];
+						}else if (el is DataGroup){
+							fieldmap["muc#"+el.id] = [];
+							for (var j:uint = 0; j< el.dataProvider.length; j++){
+								if ( el.dataProvider.getItemAt(j).selected) fieldmap["muc#"+el.id][j] =  el.dataProvider.getItemAt(j).value;
+							}
+							
+						}
+					}
+				
+				}while (true);
+			
+				fieldmap["muc#roomconfig_passwordprotectedroom"] = [Number (roomconfig_passwordprotectedroom.selected)];
+				fieldmap['FORM_TYPE']  =  ["http://jabber.org/protocol/muc#roomconfig"];
+				
+				formExtesion.setFieldMap(fieldmap);
+				mucOwnerExtension.addExtension(formExtesion);
+				
+				var mucEvent:MUC_UI_Event;
+				mucEvent = new MUC_UI_Event(MUC_UI_Event.CREATE_NEW_CHANNEL);
+				mucEvent.service = servicesField.selectedItem.jid;
+				mucEvent.extension = mucOwnerExtension;
+				mucEvent.callBack = onIqSent;
+				mucEvent.itemName = roomconfig_roomname.text;
+				mucEvent.fieldmap = fieldmap;
+				mucEvent.subject = roominfo_subject.text;
+				
+				
+				if (isInfo) mucEvent.action = MUC_UI_Event.actionEdit;
+				else mucEvent.action = MUC_UI_Event.actionAdd;
+				dispatchEvent( mucEvent );
+				
+				//(event.currentTarget as Button).parentApplication['close']();
+				
+				//close_clickHandler(event);
+			
+			}
+			private function onIqSent(iq:IQ):void {
+				if (iq.type == IQ.TYPE_ERROR){
+					_extenstions.enabled = true;
+					return;
+				}
+				setTimeout(close_clickHandler,1000,null);
+			}
+			
+		
+			
+		]]>
+	</fx:Script>
+	<s:Scroller id="_scroller" left="0" right="0" top="0" bottom="0" creationComplete="scroller1_creationCompleteHandler(event)">
+	
+		<s:Group  width="100%" id="_extenstions">
+			<s:layout>
+				<s:VerticalLayout gap="7"
+					paddingBottom="10"
+					paddingTop="12"
+					paddingLeft="12"
+					paddingRight="10"/>
+			</s:layout>
+	
+			<s:Label text="Service:" includeInLayout="{!isInfo}" visible="{!isInfo}" />
+			<s:DropDownList  includeInLayout="{!isInfo}" visible="{!isInfo}"  dataProvider="{_servicesData}" width="100%" id="servicesField" enabled="{_servicesData.length>1}" selectedIndex="0" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"/>
+			
+			<s:Label text="Channel name:" />
+			<s:TextInput id="roomconfig_roomname" width="100%" />
+			
+			<s:Spacer height="5"/>
+			
+			<s:Label text="Current Discussion Topic:" />
+			<s:TextInput id="roominfo_subject" width="100%" />
+			
+			<s:Spacer height="5"/>
+			
+			<s:Label text="Tags (separate with comma):" />
+			<utils:ListInput id="_tags" width="100%" />
+			
+			<s:Spacer height="5"/>
+			
+			<s:Label text="Short Description of Room" />
+			<s:TextInput id="roomconfig_roomdesc" width="100%" />
+			
+			<!--s:Label text="Channel Topic:"/-->
+			<!--s:TextArea id="_topic"  width="100%" heightInLines="3" contentBackgroundColor="#FFFFFF"/-->
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Room Icon: " left="3"/>
+			<s:Button label="Upload icon"/>
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Access: " left="3"/>
+			<s:HGroup>
+				<s:RadioButton label="Public" groupName="roomconfig_roomsecret" selected="true" />
+				<s:RadioButton label="Private (password protected)" id="roomconfig_passwordprotectedroom" groupName="roomconfig_roomsecret"  />
+			</s:HGroup>
+				
+			
+			
+			
+			<s:Spacer height="2"/>
+			<s:Label text="Password: " enabled="{roomconfig_passwordprotectedroom.selected}" left="3"/>
+			<s:TextInput id="confirm_roomconfig_roomsecret" displayAsPassword="true"  enabled="{roomconfig_passwordprotectedroom.selected}" width="100%"/>
+			<s:Label text="Confirm password: " enabled="{roomconfig_passwordprotectedroom.selected}" left="3"/>
+			<s:TextInput id="roomconfig_roomsecret" displayAsPassword="true"  enabled="{roomconfig_passwordprotectedroom.selected}" width="100%"/>
+			
+			
+			
+			<!--s:Spacer height="5"/>
+			<s:Label text="Allow members to create discussions?"/>
+			<s:HGroup>
+				<s:RadioButton label="No"  groupName="allowcreatediscussions"  />
+				<s:RadioButton label="Yes"  groupName="allowcreatediscussions" selected="true"  />
+			</s:HGroup>
+			
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Allow members to create topics?"/>
+			<s:HGroup>
+				<s:RadioButton label="No"  groupName="allowcreatetopics"/>
+				<s:RadioButton label="Yes" groupName="allowcreatetopics" selected="true"/>
+			</s:HGroup-->
+		
+			<s:Spacer height="5"/>
+			<s:Label text="Who Can Send Private Messages?"/>
+			<s:DropDownList id="roomconfig_allowpm" width="100%" dataProvider="{roomconfig_allowpm_data}"   itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"/>
+		
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Maximum Number of Occupants"/>
+			
+			<s:DropDownList id="roomconfig_maxusers"  width="100%" dataProvider="{roomconfig_maxusers_data}"  itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"/>
+			
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Roles and Affiliations that May Retrieve Member List"/>
+			<s:DataGroup dataProvider="{roomconfig_getmemberlist_data}" id="roomconfig_getmemberlist">
+				<s:layout>
+					<s:HorizontalLayout/>
+				</s:layout>
+				<s:itemRenderer>
+					<fx:Component>
+						<s:ItemRenderer autoDrawBackground="false">
+							<s:CheckBox label="{data.label}" name="{data.value}" selected="@{data.selected}" />
+						</s:ItemRenderer>
+					</fx:Component>
+				</s:itemRenderer>
+				
+			</s:DataGroup>
+			<!--s:DropDownList id="roomconfig_getmemberlist"  width="100%" dataProvider="{getmemberlis}" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"/-->
+			
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Roles for which Presence is Broadcasted"/>
+			<s:DataGroup dataProvider="{roomconfig_presencebroadcast_data}" id="roomconfig_presencebroadcast">
+				<s:layout>
+					<s:HorizontalLayout/>
+				</s:layout>
+				<s:itemRenderer>
+					<fx:Component>
+						<s:ItemRenderer autoDrawBackground="false">
+							<s:CheckBox label="{data.label}" name="{data.value}" selected="@{data.selected}" />
+						</s:ItemRenderer>
+					</fx:Component>
+				</s:itemRenderer>
+				
+			</s:DataGroup>
+			
+			
+			
+			
+			<s:Spacer height="5"/>
+			<s:Label text="Who May Discover Real JIDs?"/>
+		
+			<s:DropDownList id="roomconfig_whois" width="100%" dataProvider="{roomconfig_whois_data}"  itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"/>
+
+			<s:Spacer height="5"/>
+			<s:Label text="You may specify additional owners for this channel." id="roomconfig_roomowners_label"/>
+		
+			<utils:ListInput id="roomconfig_roomowners" width="100%" />
+			<s:Button label="Add" click="{addItemClick(roomconfig_roomowners,roomconfig_roomowners_label.text)}" />
+			
+		
+			<s:Spacer height="5"/>
+			<s:Label text="You may specify additional people who have admin status in the room." id="roomconfig_roomadmins_label"/>
+		
+			
+			<utils:ListInput id="roomconfig_roomadmins" width="100%" />
+			<s:Button label="Add" click="{addItemClick(roomconfig_roomadmins,roomconfig_roomadmins_label.text)}"/>
+	
+			<s:Spacer height="5"/>
+			<s:CheckBox label="Make Room Publicly Searchable" id="roomconfig_publicroom" selected="true"/>
+			<s:CheckBox label="Make Room Persistent" id="roomconfig_persistentroom" selected="true"/>
+			<s:CheckBox label="Make Room Moderated" id="roomconfig_moderatedroom"/>
+			<s:CheckBox label="Make Room Members-Only" id="roomconfig_membersonly"/>
+			<s:CheckBox label="Enable Public Logging" id="roomconfig_enablelogging" selected="true" />
+			<s:CheckBox label="Allow Occupants to Change Subject" id="roomconfig_changesubject"/>
+			<s:CheckBox label="Allow Occupants to Invite Others" id="roomconfig_allowinvites"/>
+
+			<!--s:Spacer height="3"/>
+			<s:CheckBox label="Alert me of new posts in channel discussion"/>
+			<s:CheckBox label="Alert me of new members"/>
+			<s:CheckBox label="Alert me of new discussions created"/-->
+			
+			
+		
+		</s:Group>
+	</s:Scroller>
+	<s:HGroup bottom="-35" right="2">
+		<s:Button label="Cancel" click="close_clickHandler(event)"/>
+		<s:Button label="{_saveLabel}" click="create_clickHandler(event)"/>
+	</s:HGroup>
+	
+</s:Group>

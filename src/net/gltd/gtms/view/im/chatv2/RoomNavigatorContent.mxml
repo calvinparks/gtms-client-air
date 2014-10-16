@@ -1,0 +1,1149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					xmlns:utils="net.gltd.gtms.view.im.utils.*"
+					width="100%" height="100%" creationComplete="init(event)"
+					>
+	<fx:Declarations>
+		<s:Animate id="anim" target="{msgScroll.viewport}" duration="200" startDelay="0" repeatDelay="0" >
+			<s:motionPaths>
+				<s:SimpleMotionPath id="pth" property="verticalScrollPosition" />
+			</s:motionPaths>
+		</s:Animate>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.Emoticons;
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.xmpp.ArchiveManager;
+			import net.gltd.gtms.events.ArchiveEvent;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.contact.GroupModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.im.RoomModel;
+			
+			import flash.utils.setTimeout;
+			
+			import flashx.textLayout.elements.DivElement;
+			import flashx.textLayout.elements.InlineGraphicElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.collections.ArrayCollection;
+			import mx.controls.DateField;
+			import mx.core.UIComponent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.PropertyChangeEvent;
+			import mx.events.ResizeEvent;
+			import mx.managers.DragManager;
+			import mx.rpc.xml.SimpleXMLDecoder;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.Message;
+			import org.igniterealtime.xiff.data.Presence;
+			import org.igniterealtime.xiff.events.RoomEvent;
+			
+			import spark.components.Window;
+		
+			[Bindable]
+			private			var			email					:String;
+			
+			[Bindable]
+			public 			var			jid						:String;
+			
+			[Bindable]
+			public 			var 		amImoderator			:Boolean;
+			
+			[Bindable]
+			public 			var 		myAffiliation			:String;
+			
+			
+			[Bindable]
+			private			var			_msgTF					:TextFlow = new TextFlow();
+			
+			[Bindable]
+			private			var			_msgTFHist				:TextFlow = new TextFlow();
+			
+			[Bindable]
+			public			var			rightMargin				:Number = 0;
+			
+			private			var			_model					:RoomModel;
+			
+		 	private			var			_hasUnreaded			:Boolean;
+			
+			private			var			_selected				:Boolean;
+		
+			private			var			_lastMsg				:Object		= {user:null,date:"",readed:false},
+										_lastEntry				:DivElement,
+										_colors					:Object = {
+											me: {t:0x14478e,b:SettingsManager.CHAT_COLOR},
+											buddy: {t:0xd84f0c,b:SettingsManager.CHAT_COLOR},
+											info: {t:0x08F8F8F,b:0x08F8F8F}
+										},
+										_today					:Date = new Date(),
+										
+										_emoticons				:Emoticons = Emoticons.getInstance(),
+										_state					:String = Message.STATE_ACTIVE,
+										_stateTimer				:Timer = new Timer (400),
+										_stillTyping			:Boolean = false,
+										_typingParagraph		:ParagraphElement,
+										_availabelColors		:Array = [0x66CCFF,0x55DC55,0xFF9900,0x9999CC,0x993399,0x669999,0xd84f0c,0xCC66FF,0x339900,0x66CCCC,0x0099CC,0x9966CC,0x663366,0x666600],
+										_moveScroll				:Boolean = false,
+										_hasHistory				:Boolean = false,
+										gettingArchiveInProgress:Boolean = false,
+										vebennhere				:Boolean = false,
+										scrollinginprogress		:Boolean,
+										_inited					:Boolean = false;
+		
+			
+			[Bindable][Embed(source="../assets/dot.png")]
+			private var dot:Class;
+			
+			public function set model( m:RoomModel ):void {
+				_model = m;
+				try {
+					model.channel.addEventListener(RoomEvent.USER_JOIN,onRoom);
+					model.channel.addEventListener(RoomEvent.USER_DEPARTURE,onRoom);
+					model.channel.addEventListener(RoomEvent.USER_PRESENCE_CHANGE,onRoom);
+					model.channel.addEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+					model.channel.addEventListener(RoomEvent.PRIVATE_MESSAGE,onRoom);
+					model.channel.addEventListener(RoomEvent.ROOM_DESTROYED,onRoom);
+					model.channel.addEventListener(RoomEvent.USER_BANNED,onRoom);
+					model.channel.addEventListener(RoomEvent.SUBJECT_CHANGE, onRoom);
+					model.channel.addEventListener(RoomEvent.USER_KICKED,onRoom2);
+					model.channel.addEventListener(RoomEvent.AFFILIATIONS,onRoom2);
+					model.channel.addEventListener(RoomEvent.AFFILIATION_CHANGE_COMPLETE,onRoom2);
+					model.channel.addEventListener(RoomEvent.GROUP_MESSAGE,onRoom2);
+					
+					
+					
+					model.channel.addEventListener("roomInited",onRoomInited);
+					
+					
+			//model.addEventListener(ArchiveEvent.CONVERSATION_READY,onConversationReady);
+			//model.addEventListener(ArchiveEvent.CONVERSATION_ERROR,onConversationReady);
+				
+				
+					
+					
+					
+					jid = model.id;
+					amImoderator = model.room.role == Room.ROLE_MODERATOR;
+					label = model.label;
+					model.description = model.room.subject;
+					
+				
+					
+					setMySettings();
+					
+					//occupants = new ArrayCollection( model.room.source );
+				 	initOccupants( model.channel.room.source );
+				//	callLater(scrollDown,[true,true]);
+					
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+			
+			}
+			[Bindable]
+			public function get model():RoomModel {
+				return _model
+			}
+			
+			public function get moveScroll():Boolean {
+				return _moveScroll;
+			}
+			public function set moveScroll(b:Boolean):void {
+				_moveScroll = b;
+			}
+			//model.addEventListener(ChatEvent.NEW_MESSAGE,onNewMessage);
+			private function onNewMessage(event:ChatEvent):void {
+				try {
+					var m:Message = model.getMessage();
+					if (m == null)return;
+					
+					var from:String = m.from.resource;
+					var c:String = "buddy";
+					if (model.room.nickname == m.from.resource){
+						c = "me"
+						from = "Me";
+					}else {
+						try {
+							from = buddiesHolder.getInstance().getBuddy(from+"@"+m.to.domain).nickname;
+						}catch (erFrom:Error){
+							from = m.from.resource;//from = m.from.node;
+						}
+					}
+					
+				
+					if (m.body == null)return;
+					var msg:String = m.body;
+					if (c != "me" && c != "info")onComposing(false,from);
+				
+					if (m.time==null){
+						setTimeout(shapeMessage,500,from,m,c,false,false,m.time,m.id);
+						setTimeout(scrollDown,500,moveScroll);
+					}else {
+						shapeMessage(from,m,c,false,false,m.time,m.id);
+						scrollDown(moveScroll);
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+				
+			}
+			private function onConversationReady(event:ArchiveEvent):void {
+				return;
+				if (event.type == ArchiveEvent.CONVERSATION_ERROR){
+					gettingArchiveInProgress = false;
+					return;
+				}
+				
+				callLater(addArchiveMessages,[model.archives]);
+				model.sesionAllArchives = model.archives.concat(model.sesionAllArchives);
+			}
+			
+			private function addArchiveMessages(source:Array):void 
+			{
+				var oldContentHeight:Number; 
+				var archiveScopeHeight:Number;
+				try {
+					oldContentHeight = msgScroll.viewport.contentHeight;
+					archiveScopeHeight = archiveScope.height;
+				}catch (error:Error){
+					oldContentHeight = 0;
+					archiveScopeHeight = model.archiveBeforeValueHeight;
+				}
+				try {
+					for (var i:int = source.length - 1; i>=0; i--){
+						var m:Message = new Message();
+						var from:String;
+						var dn:String;
+						if ( source[i].jid != undefined ){
+							m.from = new EscapedJID( source[i].jid );
+							from = "buddy";
+							try {
+								dn = buddiesHolder.getInstance().getBuddy( source[i].jid ).nickname;
+							}catch (erFrom:Error){
+								dn = source[i].jid;
+							}	
+						}else {
+							from = "me";
+							dn ="Me";
+						}
+						m.body = source[i].body;
+						if (!source[i].time)source[i].time = ArchiveManager.convertToDate( model.archiveStart, Number(source[i].secs) );
+						var time:Date = m.time;
+						if (!time) time =  source[i].time;
+						shapeMessage(dn,m,from,true,true,time);
+					}
+					onHeightChanged(null);
+					
+					//.validateProperties();
+					//msgHistory.validateProperties();
+					//msgHistory.validateProperties();
+					
+					if (!vebennhere){
+						vebennhere = true;
+						scrollDown(true,true,85);
+						
+					}else {
+						callLater(function():void {
+							try {
+								anim.stop();
+								var newContentHeight:Number = Math.abs(oldContentHeight - msgScroll.viewport.contentHeight);
+								msgScroll.viewport.verticalScrollPosition += (newContentHeight)// - (archiveScopeHeight - archiveScope.height) );
+							}catch (error:Error){}
+							
+						});
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+				gettingArchiveInProgress = false;
+				//createLineElement(true);//?>
+			}
+			
+			
+			private function onRoomInited(e:Event):void {
+				initOccupants( model.channel.room.source );
+			}
+			private function onRoom2(e:RoomEvent):void {
+				
+				if (e.type==RoomEvent.GROUP_MESSAGE){
+					if (!model.hasUnreaded)model.markUser(true);
+					//return;
+				}
+				onRoom(e);
+			}
+			private function onRoom(e:RoomEvent):void {
+				try {
+					if (!_inited){
+						setTimeout(onRoom,200,e.clone());
+						return
+					}
+					
+					occupants.refresh();
+					setMySettings();
+					var infoMessage:String;
+					var usernickname:String = e.nickname;
+					try {
+						 if (e.data is Presence) {
+							usernickname = e.data.from.resource;
+						}else if (e.data is Message) {
+							usernickname = (e.data as Message).from.resource;
+						}
+
+						 usernickname = buddiesHolder.getInstance().getBuddy(usernickname+"@"+model.room.connection.jid.domain).nickname;
+						 
+					}catch (errorDn:Error){
+					//	usernickname = e.nickname;
+
+					}
+					if (usernickname == null){
+						usernickname = "Participant";
+					}
+					
+					if (e.type == RoomEvent.USER_JOIN){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_ENTER,{
+							nickname:usernickname
+						})
+						setTimeout(displayMessage, 700, "",(new Date()),infoMessage,"info",false);
+					}
+					else if(e.type == RoomEvent.USER_DEPARTURE ){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_LEFT,{
+							nickname:usernickname
+						})
+						
+						setTimeout(displayMessage, 500, "", new Date(), infoMessage,"info");
+						//removeOccupant( (e.data as Presence).from.unescaped )
+					}
+					else if( e.type == RoomEvent.ROOM_LEAVE){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_LEFT,{
+							nickname:model.room.nickname
+						})
+						
+						setTimeout(displayMessage, 500, "", new Date(), infoMessage,"info");
+						//removeOccupant( (e.data as Presence).from.unescaped )
+					}
+					else if (e.type == RoomEvent.USER_BANNED){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_BANNED,{
+							nickname:usernickname
+						})
+						setTimeout(displayMessage,500,"", new Date(),infoMessage,"info");
+//removeOccupant((e.data as Presence).from.unescaped)
+					}else if (e.type == RoomEvent.USER_KICKED){
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_KICK,{
+							nickname:usernickname
+						})
+						setTimeout(displayMessage,500,"", new Date(),infoMessage,"info");
+					}else if (e.type == RoomEvent.SUBJECT_CHANGE){
+					//	<message to="pkownacki@im.gltd.net/office" type="groupchat" from="pk2@conference.im.gltd.net"><subject>nowy </subject><delay stamp="2013-03-24T14:34:23.773Z" xmlns="urn:xmpp:delay" from="pk2@conference.im.gltd.net" /><x stamp="20130324T14:34:23" xmlns="jabber:x:delay" from="pk2@conference.im.gltd.net" /></message>
+						infoMessage = UIphrases.getPhrase( UIphrases.ROOM_USER_CHANGE_SUBJECT,{
+							nickname:usernickname,subject:e.subject
+						})
+						setTimeout(displayMessage,500,"",new Date(),infoMessage,"info");
+						
+						
+						label = model.label;
+						
+					}else if (e.type == RoomEvent.USER_PRESENCE_CHANGE){
+						
+					if ( (e.data as Presence).getAllExtensionsByNS("http://jabber.org/protocol/muc#user"))
+					{
+					
+					/*	You have been given a voice in this chat
+						You have been granted moderator privileges
+						You have been granted administrator privileges
+						Your voice has been revoked
+						Your moderator privileges have been revoked
+						Your admin privileges have been revoked
+						
+						You have been given a voice in this chat
+						You have been granted moderator privileges
+						You have been granted administrator privileges
+						Your moderator privileges have been revoked
+						Your admin privileges have been revoked
+						You have been granted membership privileges
+						Your voice has been revoked
+						Your membership has been revoked
+						
+						You have been given a voice in this chat
+						You have been granted moderator privileges
+						Your have been granted owner privileges
+						Your voice has been revoked
+						Your moderator privileges have been revoked
+						Your owner privileges have been revoked
+						
+						ROOM_PRIVILEGES_CHANGED <presence id="lU3DN-322" from="petersone@conference.im.gltd.net/pkownacki2" to="pkownacki@im.gltd.net/office"><x xmlns="http://jabber.org/protocol/muc#user"><item role="participant" affiliation="none" jid="pkownacki2@im.gltd.net/Spark 2.6.3" /></x></presence>
+						ROOM_PRIVILEGES_CHANGED <presence id="lU3DN-322" from="petersone@conference.im.gltd.net/pkownacki2" to="pkownacki@im.gltd.net/office"><x xmlns="http://jabber.org/protocol/muc#user"><item role="moderator" affiliation="owner" jid="pkownacki2@im.gltd.net/Spark 2.6.3" /></x></presence>
+						*/
+						var pjid:UnescapedJID;
+						var info_m:String;
+						try {
+							if ((e.data as Presence).status != null) return;
+							pjid = new UnescapedJID( (e.data as Presence).getExtension("item").xml.attribute('jid') );
+							usernickname = buddiesHolder.getInstance().getBuddy(pjid.bareJID).nickname;
+						}catch (err:Error){
+							usernickname = (e.data as Presence).from.resource;
+						}
+						try {
+							usernickname = buddiesHolder.getInstance().getBuddy(usernickname+"@"+model.room.connection.jid.domain).nickname;
+						}catch(errGB2:Error){
+							
+						}
+						try {
+							var _obj:Object = _xmlDecoder.decodeXML(new XMLDocument(  e.data ).firstChild );
+							if (_obj.x is Array)
+							{
+								for (var xi:uint =0;xi<_obj.x.length;xi++){
+									if ( _obj.x[xi].hasOwnProperty("item") &&  _obj.x[xi]['item'].hasOwnProperty('affiliation') ){
+										_obj.x =  _obj.x[xi];
+										break;
+									}
+								}
+							}
+						//	trace ("_obj.x.item.affiliation",_obj.x.item.affiliation);
+						//	trace ("_obj.x.item.role",_obj.x.item.role);
+							if (_obj.x.item.affiliation == Room.AFFILIATION_ADMIN){
+								info_m = "{nickname} has been granted administrator privileges"
+							}else if (_obj.x.item.affiliation == Room.AFFILIATION_OWNER){
+								info_m = "{nickname} has been granted owner privileges"
+							}else if (_obj.x.item.affiliation == Room.AFFILIATION_MEMBER){
+								info_m = "{nickname} has been granted membership privileges"
+							}else if (_obj.x.item.role == Room.ROLE_NONE){
+								info_m = "{nickname}'s admin privileges have been revoked";
+							}else if (_obj.x.item.role == Room.ROLE_PARTICIPANT){
+								info_m = "{nickname}'s admin privileges have been revoked";
+							}else {
+								info_m = UIphrases.ROOM_PRIVILEGES_CHANGED;
+							}
+							
+							
+							
+						}catch (err9:Error){
+							info_m = UIphrases.ROOM_PRIVILEGES_CHANGED;
+						}
+						infoMessage = UIphrases.getPhrase( info_m ,{
+							nickname:usernickname
+						})
+						setTimeout(displayMessage,500,"",new Date(),infoMessage,"info");
+						
+					}
+				
+					}else if (e.type == RoomEvent.GROUP_MESSAGE || RoomEvent.PRIVATE_MESSAGE){
+					
+						var m:Message = e.data as Message;
+						if (m == null || m.state == null)return;
+						var c:String = "buddy";
+						var from:String;
+						if (model.room.nickname == m.from.resource){
+							c = "me"
+							from = "Me";
+						}else {
+							try {
+								from = buddiesHolder.getInstance().getBuddy(from+"@"+m.to.domain).nickname;
+							}catch (erFrom:Error){
+								from = m.from.resource;//from = m.from.node;
+							}
+						}
+						
+						if (c == "me")return;
+						if (m.from.bareJID == model.room.connection.jid.bareJID)return;
+						if (m.state == Message.STATE_COMPOSING)onComposing(true,from);
+						else if (m.state == Message.STATE_ACTIVE) onComposing(false,from);
+						
+					}
+				
+				}catch (err:Error){
+					trace (err.getStackTrace());
+				}
+				
+			}
+			private var _xmlDecoder			:SimpleXMLDecoder = new SimpleXMLDecoder();
+			private var typingPersons		:Object = {};
+			private function onComposing(composing:Boolean,who:String):void {
+				try {
+				
+					typingPersons[who] = composing;
+					var s:String = "";
+				
+					for (var ind:String in typingPersons){
+						if (!typingPersons[ind])continue;
+						s += ind + ", "
+					}
+					s = s.slice(0,s.length-2);
+					try {
+						_msgTF.removeChild( _typingParagraph );
+					}catch (error0:Error){
+						
+					}
+					if (s.length > 0){
+						_typingParagraph = _emoticons.showTyping(s);
+						_msgTF.addChild( _typingParagraph );
+						msgDisplay.appendText("");
+					}
+					callLater(scrollDown,[moveScroll] );
+				}catch (error:Error){
+					trace ("error composing",error)
+				}
+			}
+			private var _info:String;
+			
+			private function setMySettings():void {
+				amImoderator = model.room.role == Room.ROLE_MODERATOR;
+				myAffiliation = model.room.affiliation;
+				info = model.room.nickname +" - "+ model.room.role +" ("+ model.room.affiliation+")"; 
+			}
+			[Bindable]
+			private function get info():String {
+				return _info//model.room.nickname +" - "+ model.room.role +" ("+ model.room.affiliation+")";
+				
+			}
+			private function set info(s:String):void {
+				_info = s;
+			}
+			
+			[Bindable]
+			public override function get label():String
+			{
+				
+				return super.label
+			}
+			
+			public override function set label(l:String):void
+			{
+				
+				if (model.room.subject != null && model.room.subject.length > 0)   super.label = l + " - " + model.room.subject;
+				else super.label = l
+			}
+			
+			protected function onKeyDown(event:KeyboardEvent):void
+			{
+				if (event.keyCode == 13 && !event.shiftKey){
+					callLater(send);
+				}
+			} 
+			protected function onInput(event:TextEvent):void
+			{
+				 
+				if ( _outgoingMsgField.text.length < 1) {
+					_stillTyping = false;
+					state = Message.STATE_ACTIVE;
+				}
+				_stillTyping = true;
+				if (state != Message.STATE_COMPOSING){
+					state = Message.STATE_COMPOSING;
+					if (!_stateTimer.running)_stateTimer.start();
+				}
+			}
+			private function set state(s:String):void {
+				_state = s;
+				dispatchEvent(new Event("stateChanged"));
+			}
+			private function get state():String {
+				return _state
+			}
+			private function onStateChange(event:Event):void {
+				//model.sendState(state);
+				model.room.sendMessageWithExtension( new Message(model.room.roomJID.escaped,null,null,null,Message.TYPE_GROUPCHAT,null,state) );
+			}
+			private function stateTick(event:TimerEvent):void {
+				if (_stateTimer.currentCount%5==1){
+					_stillTyping = false;
+				}else if (_stateTimer.currentCount%5==2){
+					if (!_stillTyping){
+						state = Message.STATE_PAUSED;
+					}
+				}else if (_stateTimer.currentCount%5==0){
+					if (!_stillTyping){
+						state = Message.STATE_ACTIVE;
+						_stateTimer.stop();
+						_stateTimer.reset()
+					}
+				}
+			}
+			public function send():void {
+			
+				var msg:String =  _outgoingMsgField.text.toString();
+				if (msg.charAt( _outgoingMsgField.selectionActivePosition - 1) == "\n"){
+					msg =  msg.slice(0,_outgoingMsgField.selectionActivePosition-1)+msg.slice(_outgoingMsgField.selectionActivePosition,msg.length);
+				}
+				/*if (msg.lastIndexOf("\n") == msg.length -1){
+					msg = msg.slice(0,msg.lastIndexOf("\n"))
+				}*/
+				var d:Date = new Date();
+		
+				var dm:String = (d.monthUTC+1).toString();
+				if (dm.length==1)dm="0"+dm;
+				
+				var dd:String = d.date.toString();
+				if (dd.length==1)dd="0"+dd;
+				
+				var stamp:String = 	d.fullYear+"-"+dm+"-"+dd+"T"+d.hoursUTC+":"+d.minutesUTC+":"+d.secondsUTC+"Z";
+				var delayNode:XMLNode = new XMLNode(1,"delay");
+				delayNode.attributes.xmlns = "urn:xmpp:delay";
+				delayNode.attributes.from = model.room.userJID.escaped.toString();
+				delayNode.attributes.stamp = stamp;
+				
+				
+			
+				var m:Message = new Message(model.room.roomJID.escaped,null,msg,null,Message.TYPE_GROUPCHAT);
+				m.xml.appendChild( new XML(delayNode) );
+				model.room.sendMessageWithExtension(m);
+				
+				
+				_outgoingMsgField.text = "";
+			}
+			protected function onCreationComplete(event:FlexEvent):void
+			{
+				(_outgoingMsgField.parentApplication)['activate']();
+				_outgoingMsgField.setFocus();
+				this.addEventListener("stateChanged",onStateChange);
+				_stateTimer.addEventListener(TimerEvent.TIMER,stateTick);
+				onResize(null);
+				callLater(scrollDown,[moveScroll] );
+			}
+			
+			public function shapeMessage(dn:String,m:Message,from:String="buddy",readed:Boolean=false,displayOnTop:Boolean=false,time:Date=null,messageID:String=null):void {
+					if (m == null)return;
+					var d:Date;
+					var color:String = from;
+					if (time != null) d = time;
+					else d = m.time;
+					if (!d) d = new Date();
+					if (dn=="" && from != "info"){
+						if (model.room.nickname == m.from.resource){
+							color = "me"
+							dn = "Me";
+						}else {
+							try {
+								dn = buddiesHolder.getInstance().getBuddy(m.from.resource+"@"+m.to.domain).nickname;
+							}catch (erFrom:Error){
+								dn = m.from.resource;
+							}
+						}
+					}
+					if (dn == null || dn == "null"){
+						color = "info";
+					}
+					if (color=="info")dn="";
+					else if (color == "buddy")color = dn;
+				
+					displayMessage(dn,d,m.body,color,readed,displayOnTop,messageID );
+					if (!readed && selected && from == "buddy"){
+						try {
+							if ( (this.parentApplication as Window).nativeWindow.active){
+								model.markUser(false);
+							}
+							
+						}catch (error:Error){
+							model.markUser(false);
+						}
+					}
+			
+			}
+			private function getDate(date:Date):String {
+				//if (isNaN(date.hours) || isNaN(date.minutes))date = new Date();
+				var min:String = date.minutes.toString();
+				if (min.length ==1) min = "0"+min;
+				var h:String = date.hours.toString();
+				if (h.length ==  1)h = "0"+h;
+				if (date.date < _today.date || date.month != _today.month){
+					return DateField.dateToString(date, "DD/MM/YYYY")+", "+h+ ":"+min;
+				}
+				return h+ ":"+min;
+			}
+			private function displayMessage(_from:String,_date:Date,_body:String,color:String,readed:Boolean=false,displayOnTop:Boolean=false,messageID:String=null):void {
+				try {
+					if (_colors[color] == undefined){
+						if (_availabelColors.length == 0)_colors[color]  ={t: Math.floor (Math.random()*0xCFCCFC) };
+						else _colors[color]= {t:_availabelColors.shift()};//{ t:Math.floor (Math.random()*0xCCCCCC) + 0x111112 }
+					}
+					
+					if (displayOnTop){
+						
+						if (_lastMsg.user != _from+displayOnTop.toString() || Math.abs(Math.floor((_lastMsg.date.time - _date.time)/60000)) > 1 ){
+							//if (color == null || color.length == 0)color = "buddy";
+							_msgTFHist.addChildAt(0, msgTitleElement(_from,_colors[color].t,getDate(_date),true) );
+						}
+						_msgTFHist.addChildAt(1, msgBodyElement(_body) );
+					}else {
+						model.description = _body.slice(0,80);
+					
+						if (_lastEntry == null ||  _lastMsg.user != _from || Math.abs(Math.floor((_lastMsg.date.time -_date.time)/60000)) > 1 ){
+							_msgTF.addChild( msgTitleElement(_from,_colors[color].t,getDate(_date) ) );
+						}
+						var b:ParagraphElement = msgBodyElement(_body);
+						if (color == "info") b.color = _colors.info.b;
+						_lastEntry.addChild( b );
+					}
+					if (messageID!=null)_lastEntry.id = messageID;
+					_lastMsg.user = _from;
+					_lastMsg.date = _date;
+					_lastMsg.readed = readed;
+					
+					callLater(scrollDown, [moveScroll]);
+					
+
+				}catch (err:Error){
+					trace (err.getStackTrace());
+				}	
+			}
+			private function scrollDown(ms:Boolean,immediately:Boolean=false,keepSpace:Number=0):void {
+				try {
+
+					_rtG.validateNow();
+					if (immediately){
+						msgScroll.viewport.verticalScrollPosition = Math.max (msgScroll.verticalScrollBar.minimum,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+					}
+					else {
+						pth.valueTo = Math.max (msgScroll.verticalScrollBar.minimum,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+						anim.play();
+					}
+				}catch (error:Error){}
+				
+			}
+			private function msgTitleElement(nickname:String, nickcolor:int, date:String, onTop:Boolean=false  ):DivElement {
+
+				var msg:DivElement = new DivElement();
+				msg.paddingLeft = msg.paddingRight = 5;
+				if (_lastEntry!=null){
+					createLineElement(onTop);
+				}else {
+					msg.paddingTop = -20;
+				}
+				var titleDiv:DivElement = new DivElement();
+				titleDiv.lineHeight  = SettingsManager.CHAT_FONT_SIZE + 7;
+				
+				var nickP:ParagraphElement = new ParagraphElement();
+				nickP.color = nickcolor;
+				//	nickP.fontWeight = "bold";
+				var nickSpan:SpanElement =  new SpanElement();
+				nickSpan.text = nickname;
+				nickP.addChild(nickSpan);
+				
+				var dateP:ParagraphElement = new ParagraphElement();
+				dateP.lineHeight = -SettingsManager.CHAT_FONT_SIZE+3;
+				dateP.color = 0xc1c1c1;
+				dateP.textAlign = "right";
+				dateP.fontSize = SettingsManager.CHAT_FONT_SIZE-1;
+				var dateSpan:SpanElement = new SpanElement();
+				dateSpan.text = "["+date+"]";
+				dateP.addChild(dateSpan);
+				
+				titleDiv.addChild(nickP);
+				titleDiv.addChild(dateP);
+				
+				
+				msg.addChild(titleDiv);
+				
+				_lastEntry = msg;
+				
+				return msg;
+				
+				
+			}
+			private function msgBodyElement(messageBody:String):ParagraphElement {
+				var p:ParagraphElement = new ParagraphElement();
+				var hasIco:Boolean = false;
+				var nodes:Array = _emoticons.find(messageBody);
+				for (var i:uint = 0; i<nodes.length;i++){
+					p.addChild(nodes[i]);
+					if (nodes[i] is InlineGraphicElement){
+						hasIco = true
+					}
+				}
+				p.paddingLeft = 4;
+				if (hasIco){
+					p.lineHeight = 30;
+				}else {
+					p.lineHeight = SettingsManager.CHAT_FONT_SIZE+6;
+				};
+				return p;
+			}
+			/*private function createLineElement():void {
+				var line:InlineGraphicElement = new InlineGraphicElement();
+				line.source = dot;
+				//line.width = msgDisplay.width;
+				BindingUtils.bindProperty(line,"width",msgDisplay,"width")
+				line.height = .5;
+				var pn:ParagraphElement = new ParagraphElement();
+				pn.addChild(line);
+				_msgTF.addChild(pn);
+			}*/
+			private function createLineElement(onTop:Boolean):void {
+			
+				//if (!onTop && !_msgTF.getChildAt(1))return;
+				var line:InlineGraphicElement = new InlineGraphicElement();
+				line.source = dot;
+	
+				line.width = 200;
+				BindingUtils.bindProperty(line,"width",msgDisplay,"width");
+				line.height = .5;
+				var pn:ParagraphElement = new ParagraphElement();
+				pn.addChild(line);
+				_msgTF.addChild(pn);
+				
+			
+			}
+			public function searchForEmotions(s:String):void {
+				_emoticons.find(s);
+			}
+			protected function init(event:FlexEvent):void
+			{
+
+				try {
+					var msg:Message;
+					var from:String;
+					var l:uint = model.readed.length;
+					for (var i:uint = 0; i<l;i++){
+						msg = model.readed[i];
+						if (msg.from != null)from = "buddy";
+						else from = "me";
+						shapeMessage("",msg,from,true);
+					}
+					
+					l = model.messages.length;
+					for (i = 0; i<l;i++){
+						msg = model.getMessage();
+						if (msg.time == null) setTimeout(shapeMessage,500,"",msg,"buddy",false);
+						else shapeMessage("",msg,"buddy",false);
+					}
+					model.addEventListener(ChatEvent.NEW_MESSAGE,onNewMessage);
+					
+					scrollDown(true,true);
+					occupants.refresh();
+					try {
+						if (model.channel.gotoMessageId!=null){
+							setTimeout(goToMessage,700,model.channel.gotoMessageId);
+							model.channel.gotoMessageId = null;
+						}
+					}catch (error:Error){
+						trace (error.getStackTrace())
+					}
+				}catch (error2:Error){
+					trace (error2.getStackTrace());
+				}
+				//onHeightChanged(null);
+				
+				/*if (model.sesionAllArchives.length>0){
+					addArchiveMessages(model.sesionAllArchives);
+					//vebennhere = false;//>>
+				}*/
+				
+			
+			
+				_inited = true;
+			}
+			private function goToMessage(id:String):void {
+				var i:int = 0;
+				var d:Object;
+				do {
+					try {
+						d = _msgTF.getChildAt(i);
+						i++;
+						if (d.hasOwnProperty("id") && d.id == id){
+							trace (d);
+						}
+						
+					}catch (error:Error){
+						trace (error.getStackTrace());
+						break
+						
+					}
+					
+				}while (true)
+			}
+			[Bindable]
+			public function get hasHistory():Boolean {
+				return _hasHistory;
+			}
+			public function set hasHistory(b:Boolean):void {
+				_hasHistory = b;
+			}
+			private function onHeightChanged(event:Event):void {
+				hasHistory = model.archiveCount > 0;
+				try {
+					archiveScope.height = model.archiveBeforeValueHeight;
+					msgHistory.top = archiveScope.height;
+					msgDisplay.top =  msgHistory.height + archiveScope.height;
+				}catch (error:Error){
+					callLater( onHeightChanged, [event] )
+				}
+			}
+			
+			public function onRemoved():void
+			{
+		trace ("onRemoved",this)
+				model.channel.removeEventListener(RoomEvent.USER_JOIN,onRoom);
+				model.channel.removeEventListener(RoomEvent.USER_DEPARTURE,onRoom);
+				model.channel.removeEventListener(RoomEvent.USER_PRESENCE_CHANGE,onRoom);
+				model.channel.removeEventListener(RoomEvent.ROOM_LEAVE,onRoom);
+				model.channel.removeEventListener(RoomEvent.PRIVATE_MESSAGE,onRoom);
+				model.channel.removeEventListener(RoomEvent.ROOM_DESTROYED,onRoom);
+				model.channel.removeEventListener(RoomEvent.USER_BANNED,onRoom);
+				model.channel.removeEventListener(RoomEvent.SUBJECT_CHANGE, onRoom);
+				model.channel.removeEventListener(RoomEvent.USER_KICKED,onRoom2);
+				
+				
+				model.channel.removeEventListener(RoomEvent.AFFILIATIONS,onRoom2);
+				model.channel.removeEventListener(RoomEvent.AFFILIATION_CHANGE_COMPLETE,onRoom2);
+				
+				model.channel.removeEventListener(RoomEvent.GROUP_MESSAGE,onRoom2);
+				model.channel.removeEventListener("roomInited",onRoomInited);
+				_stateTimer.removeEventListener(TimerEvent.TIMER,stateTick);
+				model.removeEventListener(ChatEvent.NEW_MESSAGE,onNewMessage);
+				
+				
+				this.removeEventListener("stateChanged",onStateChange);
+				this.removeAllElements();
+				
+			}
+			public function set selected(b:Boolean):void {
+				_selected = b;
+				//hasUnreaded = false;
+				if (b) {
+					model.hasUnreaded = true;
+					//callLater(_outgoingMsgField.setFocus);
+				}
+				model.markUser(false)
+			}
+			public function get selected():Boolean {
+				return _selected;
+			}
+			
+			
+			
+			[Bindable]
+			private var occupants:ArrayCollection = new ArrayCollection();
+			
+			public function initOccupants(source:Array):void {
+				occupants.source = (source);
+				occupants.refresh();
+			}
+			private function removeMe(obj:Object):Boolean {
+				return model.room.connection.jid.bareJID != obj.jid.bareJID; 
+			}
+			public function setInputString(s:String):void {
+				_outgoingMsgField.appendText(  s );
+				_outgoingMsgField.setFocus();
+			}
+			
+			protected function onResize(event:ResizeEvent):void
+			{
+				rightMargin = 11;
+				if (_participants.visible) rightMargin+=_participants.width ;
+			}
+			
+			private function contacDrag(event:DragEvent):void {
+				if (event.type == DragEvent.DRAG_COMPLETE ){
+					return
+				}
+				var n:String = (event.dragInitiator as List).name;
+				if (event.type == DragEvent.DRAG_ENTER ){
+					if (n.indexOf("contactItem") == 0)DragManager.acceptDragDrop(event.currentTarget as UIComponent);
+					return
+				}
+				var i:uint
+				var ao:Boolean =false;
+				var bdId:String
+				if (event.type == DragEvent.DRAG_DROP){
+					
+					if ( (event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'] is GroupModel)){
+						try {
+							var gm:GroupModel = event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'] as GroupModel;
+							var recipients:Array = [];
+							
+							for ( i = 0; i< gm.itemCollection.length; i++){
+								ao = false;
+								bdId = gm.itemCollection.getItemAt(i).id;
+								for (var j:uint = 0; j<occupants.length;j++){
+									if ( gm.itemCollection.getItemAt(i).roster.jid.bareJID == bdId){
+										ao = true; 
+									}
+								}
+								if (!ao)model.room.invite(new UnescapedJID(gm.itemCollection.getItemAt(i).roster.jid),"");
+							}
+							
+						}catch (error:Error){}
+					} else {
+						bdId = (event.dragSource.dataForFormat(event.dragSource.formats[0])[0]['data'].id);
+						
+						for ( i = 0; i<occupants.length;i++){
+							if ( (occupants.getItemAt(i) as RoomOccupant).jid.bareJID == bdId){
+								ao = true;
+								break;
+							}
+						}
+						if (!ao)model.room.invite(new UnescapedJID(bdId),"");
+						//	chatsCollection.addItem(mm);
+						
+					}
+				}
+			}
+			protected function initScroll(event:FlexEvent):void
+			{
+				msgScroll.viewport.addEventListener(PropertyChangeEvent.PROPERTY_CHANGE, onScroll);
+				
+				callLater(scrollDown,[moveScroll,true,70]);
+				
+				//	trace ("msgScroll.verticalScrollBar.stepSize",msgScroll.verticalScrollBar.stepSize);
+				//	msgScroll.verticalScrollBar.stepSize = 22;
+				//	msgScroll.horizontalScrollBar.stepSize = 22;
+			}
+			
+			private function onScroll(e:PropertyChangeEvent):void {
+				if (scrollinginprogress )return;
+				if (e.source == e.target && e.property == "verticalScrollPosition"){
+					
+					if ((e.newValue < e.oldValue) && (model.archiveBeforeValue > 0) && (e.newValue  <= (msgScroll.verticalScrollBar.minimum+archiveScope.height) )){		
+						
+						if (!gettingArchiveInProgress){
+							
+							gettingArchiveInProgress = true;
+//model.getNewArchiveConversation();
+							//model.getArchiveConversation(model.jid.escaped,null);	
+							//	setTimeout(model.getArchoveConversation,50,model.jid.escaped,null);	
+						}	
+					}
+				}
+			}
+		 
+			
+		]]>
+	</fx:Script>
+
+	
+		
+		<mx:HDividedBox width="100%" height="100%" top="0" horizontalGap="1" dividerColor="#77db40" dividerAffordance="100"  backgroundAlpha="1" backgroundColor="#FFFFFF">
+			<mx:VDividedBox width="100%" height="100%" top="0" verticalGap="3" dividerColor="#77db40" dividerAffordance="100"  backgroundAlpha="1" backgroundColor="#FFFFFF">
+				<s:SkinnableContainer id="_incommingMsg" width="100%" height="80%">
+				<s:Group width="100%" height="31" id="_members" toolTip="{info}" >
+					<s:Rect id="backgroundRect" left="1" top="1" right="1" bottom="1" radiusX="3" radiusY="3" >
+						<s:fill>
+							<s:LinearGradient rotation="90">
+								<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".89"/>	
+								<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+							</s:LinearGradient>
+							
+						</s:fill>
+					</s:Rect>
+					<s:Label text="{label}"  left="6" right="12" top="9" maxDisplayedLines="1"
+							 styleName="_contactItemDN" color="#FCFCFC"  />
+					
+					
+					
+					<!--
+					<s:HGroup  right="6" top="7">
+						
+						
+						<s:Button toolTip="Invite to Chat"
+								  buttonMode="true" id="_inviteButton"
+								  styleName="chatWindowButtonSkin"
+								  enabled="{myAffiliation != Room.AFFILIATION_NONE}"
+								  click="invite(event)"/>
+						
+						<s:Button toolTip="Leave Room"
+								  icon="@Embed('../assets/exit_ico.png')"
+								  buttonMode="true" id="_leaveButton"
+								  styleName="chatWindowButtonSkin"
+								  click="{model.room.leave()}"
+								  />
+						
+						<s:Button toolTip="Destroy Room"
+								  icon="@Embed('../assets/skins/main_tabs_ico/main_Logout.png')"
+								  buttonMode="true" id="_destroyButton"
+								  styleName="chatWindowButtonSkin"
+								  click="{model.room.destroy('')}"
+								  enabled="{myAffiliation == Room.AFFILIATION_OWNER}"
+								  />
+					</s:HGroup>
+					
+					-->
+					
+				</s:Group>
+					
+				<s:Scroller horizontalScrollPolicy="off" id="msgScroll" width="100%"  top="31" bottom="0" creationComplete="initScroll(event)"    >
+					<s:viewport>
+						<s:Group clipAndEnableScrolling="true" width="100%" id="_rtG" >
+							<s:SkinnableContainer width="100%" minHeight="0" includeInLayout="{hasHistory}"
+												  left="0" right="0"
+												  height="{model.archiveBeforeValueHeight}"
+												  id="archiveScope"
+												  backgroundColor="#00FF00"
+												  backgroundAlpha="0" />
+							
+							<s:RichEditableText id="msgHistory"  includeInLayout="{hasHistory}"
+												editable="false" minHeight="0" 
+												paddingBottom="8" paddingTop="5"
+												top="{model.archiveBeforeValueHeight}" 	left="0" right="0"
+												fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+												textFlow="{_msgTFHist}"
+												/> 
+							<s:RichEditableText id="msgDisplay" 
+												editable="false" minHeight="{msgScroll.height-2}"
+												left="0" right="0" top="{msgHistory.height + archiveScope.height}"
+												paddingBottom="8" paddingTop="4" 
+												fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+												textFlow="{_msgTF}"
+												/>
+						</s:Group>
+					</s:viewport>
+					
+				</s:Scroller>
+			</s:SkinnableContainer>
+			<s:SkinnableContainer id="_outgoingMsg" height="65" width="100%" minHeight="40" styleName="_newOutgoingMessageBox" backgroundColor="#FFFFFF"  >
+				<s:TextArea id="_outgoingMsgField" left="4" right="0" top="0" bottom="0" fontSize="{SettingsManager.CHAT_FONT_SIZE}"
+						color="#434343"
+						textInput="onInput(event)"
+						paragraphSpaceAfter="0"
+						borderVisible="true"
+						borderAlpha=".0"
+						contentBackgroundAlpha="0"
+						keyDown="onKeyDown(event)"
+						creationComplete="onCreationComplete(event)"
+						paragraphSpaceBefore="0"  whiteSpaceCollapse="collapse" breakOpportunity="auto"  />
+			</s:SkinnableContainer>
+		</mx:VDividedBox>
+		
+		<s:Group width="160" minWidth="120" height="100%"  resize="onResize(event)" id="_participants">
+		
+			<s:Group left="0" right="1" height="31" >
+				<s:Rect id="background2Rect" left="1" top="1" right="1" bottom="1" radiusX="3" radiusY="3" >
+					<s:fill>
+						<s:LinearGradient rotation="90">
+							<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".89"/>	
+							<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+						</s:LinearGradient>
+						
+					</s:fill>
+				</s:Rect>
+				<s:Label text="Participants"
+						 color="#FCFCFC" left="6" right="12" top="9"/>
+			</s:Group>
+			<s:List left="0" right="0" bottom="0" top="33"
+					dataProvider="{occupants}"
+					horizontalScrollPolicy="off"
+					contentBackgroundAlpha="1" contentBackgroundColor="#FFFFFF" borderVisible="false"
+					itemRenderer="net.gltd.gtms.view.im.chatv2.Occupantv2TabItemRenderer"
+					dragEnter="contacDrag(event)"
+					dragComplete="contacDrag(event)" 
+					dragStart="contacDrag(event)"
+					dragDrop="contacDrag(event)">
+				<s:layout>
+					<s:VerticalLayout gap="1" paddingLeft="2"  paddingRight="2"/>
+				</s:layout>
+			</s:List>
+			<mx:VRule height="100%" strokeColor="0xCDCDCD" left="0"/>
+		</s:Group>
+		
+		</mx:HDividedBox>
+</s:NavigatorContent>

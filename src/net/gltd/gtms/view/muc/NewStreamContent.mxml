@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:parsley="http://www.spicefactory.org/parsley"
+		 width="100%" height="100%" addedToStage="addedToStage(event)">
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.muc.MUCInterfaceManager;
+			import net.gltd.gtms.controller.muc.StreamsManager;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.dataHolder;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.model.muc.StreamModel;
+			import net.gltd.gtms.utils.CheckList;
+			import net.gltd.gtms.view.ListItem2;
+			import net.gltd.gtms.view.SearchBar;
+			import net.gltd.gtms.view.im.contactList.BuddyItemRenderer;
+			import net.gltd.gtms.view.im.contactList.BuddySmallItemRenderer;
+			import net.gltd.gtms.view.im.utils.ListInput;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Spacer;
+			import mx.core.FlexGlobals;
+			import mx.core.UIComponent;
+			import mx.events.CollectionEvent;
+			import mx.rpc.xml.SimpleXMLDecoder;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.data.IQ;
+			
+			import spark.components.Button;
+			import spark.components.CheckBox;
+			import spark.components.Label;
+			import spark.components.SkinnableContainer;
+			import spark.components.TextInput;
+			import spark.components.VGroup;
+			import spark.components.Window;
+			import spark.components.supportClasses.ItemRenderer;
+			import spark.events.IndexChangeEvent;
+			
+			
+			private		var			_xmlDecoder					:SimpleXMLDecoder = new SimpleXMLDecoder(),
+									_iq							:IQ,
+									_iqObject					:Object,
+									_sessionid					:String,
+									_node						:String,
+									_service					:String,
+									
+									
+									_item						:StreamModel,
+									_idField					:Object;
+			[Inject]
+			public		var			muc							:MUCInterfaceManager;
+			
+			[Bindable]
+			private		var			_actionType					:String;
+			
+			public function set item(it:StreamModel):void {
+				if (it == null){
+					_actionType = "Create";
+					return;
+				}
+				_actionType = "Update";
+				
+				_item = it;
+			}
+			public function get iqObject():Object {
+				return _iqObject;
+			}
+			public function set data(xml:IQ):void {
+				this._iq = xml;
+			
+				_iqObject = _xmlDecoder.decodeXML(new XMLDocument(xml.xml).firstChild );
+				_sessionid = _iqObject.command.sessionid;
+				_node = _iqObject.command.node;
+				_service = _iqObject.from;
+				var length:uint = _iqObject.command.x.field.length;
+				for (var i:uint = 0; i<length; i++){
+					
+					if (_actionType == "Update" && _iqObject.command.x.field[i]['var']=="id") {
+						_idField = _iqObject.command.x.field[i];
+						_idField['value'] = _item.id;
+						continue;
+					
+					}
+					
+					switch(_iqObject.command.x.field[i].type)
+					{
+						case "hidden":
+						{
+							continue;
+						}
+							
+						case "boolean":
+						{
+							var ch:CheckBox = new CheckBox();
+							ch.label = _iqObject.command.x.field[i].label;
+							ch.id = _iqObject.command.x.field[i]['var'];
+							_container.addElement(ch);
+							_container.addElement(new Spacer());
+							
+							
+							if (_actionType == "Update"){
+								try {
+									ch.selected = _item[_iqObject.command.x.field[i]['var']];
+								}catch (erro:Error){
+									ch.selected  = false;
+								}
+							}else {
+								ch.selected = true;
+							}
+							break;
+						}
+						case "text-single":
+						{
+						
+							var lab:Label = new Label();
+							lab.text = _iqObject.command.x.field[i].label;
+							_container.addElement(lab);
+							
+						
+					
+							
+							if (_iqObject.command.x.field[i]['var'] == "channels" || _iqObject.command.x.field[i]['var'] == "participants" || _iqObject.command.x.field[i]['var'] == "keywords"){
+								var li:ListInput = new ListInput();
+								li.id = _iqObject.command.x.field[i]['var'];
+								li.toolTip = _iqObject.command.x.field[i].desc;
+								li.percentWidth = 100;
+								if (_actionType == "Update"){
+									try {
+										var s:String = _item[_iqObject.command.x.field[i]['var']];
+										var all:Array = s.split(",");
+										var iuu:uint;
+										var lb:String;
+										if (_iqObject.command.x.field[i]['var'] == "channels"){
+											setTimeout(function(_li:ListInput,_all:Array):void {
+												var _lb:String;
+												for (var iuuu:uint = 0; iuuu<_all.length;iuuu++){
+												
+													try {
+														_lb = muc.items.getItemByID( _all[iuuu] )['label'];
+													}catch (erU:Error){
+														_lb = _all[iuuu];
+													}
+													_li.addItem(_all[iuuu],_lb);
+												}
+											},400,li,all);
+										}
+										else if (_iqObject.command.x.field[i]['var'] == "participants"){
+											for (iuu = 0; iuu<all.length;iuu++){
+												try {
+													lb = buddiesHolder.getInstance().getBuddy(all[iuu]).nickname;
+												}catch (erU:Error){
+													lb = all[iuu]
+												}
+												li.addItem(all[iuu],lb);
+											}
+										}else {
+											li.text = _item[_iqObject.command.x.field[i]['var']];
+										}
+										
+								
+									}catch (err2:Error){
+										
+									}
+								}
+								
+								_container.addElement(li);
+								if ( _iqObject.command.x.field[i]['var'] != "keywords"){
+									var bt:Button = new Button();
+									bt.label = "Edit";
+									bt.addEventListener(MouseEvent.CLICK,addItemClick(li,_iqObject.command.x.field[i].desc, _iqObject.command.x.field[i]['var']));
+									_container.addElement(bt);
+								}
+							}else {
+								var ti:TextInput = new TextInput();
+								ti.id = _iqObject.command.x.field[i]['var'];
+								ti.toolTip = _iqObject.command.x.field[i].desc;
+								ti.percentWidth = 100;
+								
+								if (_iqObject.command.x.field[i].hasOwnProperty("required")){
+									ti.name = "R_"+ _iqObject.command.x.field[i].label
+								}
+							
+								if (_actionType == "Update"){
+									try {
+										ti.text = _item[_iqObject.command.x.field[i]['var']];
+									}catch (err2:Error){
+										
+									}
+								}
+								
+								_container.addElement(ti);
+							}
+							
+						
+							
+							_container.addElement(new Spacer());
+							
+							
+							break;
+						}
+							
+						default:
+						{
+							break;
+						}
+					}
+				}
+				
+			}
+			
+			protected var wind:Window;
+			protected function addItemClick(input:ListInput,title:String,type:String=null):Function
+			{
+				
+				return function (event:MouseEvent):void {
+					try {
+						search_filter = "";
+						selectedList = {};
+						if (wind != null && wind.closed==false)wind.close();
+						
+						wind = dataHolder.getInstance().getWindow(title,true,"none",440,400,false,false,true,true);
+						
+						var dp:ArrayCollection = new ArrayCollection();
+						var tmpList:CheckList = new CheckList();
+						
+						var v:Vector.<int> = new Vector.<int>();
+						var i:uint;
+					
+						if (type == "participants"){
+							for (i=0; i<buddiesHolder.getInstance().length; i++){
+								if (buddiesHolder.getInstance().getBuddy(i) is IMBuddyModel){
+								if ( (buddiesHolder.getInstance().getBuddy(i) as IMBuddyModel).roster.jid.domain != muc.iqsManager.connection.jid.domain)continue;
+									dp.addItem(
+										{
+											label: buddiesHolder.getInstance().getBuddy(i)['roster']['nickname'] + " (" + buddiesHolder.getInstance().getBuddy(i)['roster']['jid'] + ")",
+											value: buddiesHolder.getInstance().getBuddy(i)['roster']['jid'] ,
+											data: buddiesHolder.getInstance().getBuddy(i),
+											id: buddiesHolder.getInstance().getBuddy(i).id
+										});
+									if (input.dp.getItemIndexByID( buddiesHolder.getInstance().getBuddy(i)['roster']['jid'].toString() ) >-1)v.push( dp.length-1 );
+								}
+							}
+							tmpList.itemRenderer = new ClassFactory( BuddyItemRenderer );
+							
+						}else {
+							for (i=0; i<muc.items.length; i++){
+								if (muc.items.getItemAt(i).kind == StreamModel.KIND_STREAM)continue;
+								
+								dp.addItem( muc.items.getItemAt(i) as ChannelModel );
+								if (input.dp.getItemIndexByID( (muc.items.getItemAt(i) as ChannelModel).jid.toString() ) >-1)v.push( dp.length -1 );
+								
+							}
+							tmpList.itemRenderer = new ClassFactory( ChannelItemRenderer );
+							
+						}
+						
+						var searBar:SearchBar = new SearchBar();
+						searBar.searchFunction = searchFunction(tmpList);
+						wind['_container'].addElement(searBar);
+					
+						
+						tmpList.percentWidth = 100;
+						tmpList.percentHeight = 100;
+						tmpList.dataProvider = dp; 
+						dp.addEventListener(CollectionEvent.COLLECTION_CHANGE,onCollChange(tmpList));
+						tmpList.addEventListener(MouseEvent.MOUSE_DOWN,onIndexChange)
+						dp.filterFunction = filterFunction;
+						tmpList.setStyle("contentBackgroundColor", "#FFFFFF");
+						tmpList.setStyle("contentBackgroundAlpha", 1 );
+			
+						tmpList.selectedIndices = v;
+						
+						tmpList.left = tmpList.right = 0
+						tmpList.top = searBar.height + 1;
+						
+						var vl:VerticalLayout = new VerticalLayout();
+						vl.gap = 1;
+						tmpList.layout = vl; 
+						
+						wind['_container'].addElement(tmpList);
+						wind['_container'].bottom += 32;
+						
+						
+						var addBt:Button = new Button();
+						addBt.label = "Add";
+						addBt.right = 8;
+						addBt.bottom = 6;
+						wind.addElement( addBt );
+						addBt.addEventListener(MouseEvent.CLICK,onItemsAdded(input,tmpList));
+					
+					}catch (error:Error){
+						trace (error.getStackTrace());
+					}
+					
+				
+				}
+			}
+			private var selectedList:Object = {};
+			private var search_filter:String = "";
+			
+			private function onIndexChange(e:MouseEvent):void {
+				 try {
+					 var obj:Object = e.target;
+					 var id:String = e.target.parentDocument.data.id;
+					if (selectedList[id] != undefined) delete selectedList[id];
+					else selectedList[id] = true;
+				 }catch (error:Error){
+					 trace (error.getStackTrace());
+				 }
+			}
+			private function onCollChange(list:CheckList):Function {
+				
+				return function (e:CollectionEvent=null):void {
+					var listData:ArrayCollection = list.dataProvider as ArrayCollection;
+					var selIts:Vector.<int> = new Vector.<int>;
+					
+					var i:uint
+					for (i = 0; i<listData.length; i++){
+						if ( selectedList [ (listData.getItemAt(i).id) ] == true) {
+							selIts.push(i);
+						}
+					}
+					list.selectedIndices = selIts;
+					
+				}
+			}
+			private function filterFunction(obj:Object):Boolean {
+				return (obj.label).toLowerCase().indexOf(search_filter) > -1
+			}
+			
+		
+			private function searchFunction(list:CheckList):Function {
+				return function(str:String):void{
+					
+					
+					onCollChange(list)();
+					search_filter = str.toLowerCase();
+					if (search_filter.length < 1){
+						(list.dataProvider as ArrayCollection).filterFunction = null;
+					}else {
+						(list.dataProvider as ArrayCollection).filterFunction = filterFunction;
+					}
+					(list.dataProvider as ArrayCollection).refresh();
+					
+					setTimeout(onCollChange(list),10);
+					setTimeout(onCollChange(list),120);
+					setTimeout(onCollChange(list),500);
+				}
+			}
+			private function onItemsAdded(input:ListInput,list:CheckList):Function {
+				
+				return function (event:MouseEvent):void {
+					
+					var value:String; 
+					var dn:String; 
+					for (var i:uint = 0; i<list.selectedItems.length; i++){ 
+						if (list.selectedItems[i].hasOwnProperty('value')){
+							value = list.selectedItems[i].value;
+							dn =  list.selectedItems[i].data.nickname;
+						}
+						else {
+							value = list.selectedItems[i].id;
+							dn =  list.selectedItems[i].label;
+						}
+						input.addItem(value,dn);
+					}
+					(event.currentTarget as Button).parentApplication['close']();
+					
+				}
+			}
+			protected function close_clickHandler(event:MouseEvent):void
+			{
+				this.parentApplication['close']();
+			}
+			protected function create_clickHandler(event:MouseEvent):void
+			{
+				
+				// robimy xmla; 
+				var i:uint = 0;
+				
+				var commandNode:XMLNode = new XMLNode(1,"command");
+				commandNode.attributes.xmlns="http://jabber.org/protocol/commands";
+				commandNode.attributes.node= _node//"http://gltd.net/protocol/chatstream:01:00:00#create-stream";
+				commandNode.attributes.sessionid = _sessionid;
+				
+				var xNode:XMLNode = new XMLNode(1,"x");
+				xNode.attributes.xmlns = "jabber:x:data";
+				xNode.attributes.type="submit";
+				
+				 
+				var field:XMLNode = new XMLNode(1,"field");
+				field.attributes['var'] = "FORM_TYPE";
+				field.attributes['type'] = "hidden";
+				var fieldValueNode:XMLNode = new XMLNode(1,"value");
+				var fieldValueNodeValue:XMLNode = new XMLNode(3,"http://gltd.net/protocol/chatstream:01:00:00");
+				fieldValueNode.appendChild(fieldValueNodeValue);
+				field.appendChild( fieldValueNode );
+				
+				
+				xNode.appendChild(field);
+				
+				
+				do {
+					i++;
+					try {
+						if ( _container.getElementAt(i) == null) break;
+					}catch (error:Error){
+						break;
+					}
+					var el:*= _container.getElementAt(i) as UIComponent;
+					
+					if (el.hasOwnProperty("id")) {
+						if (el.id != null){
+							var node:XMLNode = new XMLNode(1,"field");
+							node.attributes['var'] = el.id;
+							
+							var valueNode:XMLNode = new XMLNode(1,"value");
+							var valueNodeValue:XMLNode;
+							
+							if (el is CheckBox){
+							//	var b:Number = Number ((el as CheckBox).selected); 
+								node.attributes['type'] = "boolean"; 
+								streamEnabled = (el as CheckBox).selected;
+								valueNodeValue = new XMLNode(3,(el as CheckBox).selected.toString());
+							}else if (el is TextInput || el is ListInput ){
+								if (el.hasOwnProperty('name') && el.name != null){
+									if (el.name.indexOf("R_")==0 && el.text.length == 0){
+										Alert.show("Field \""+ (el.name as String).split("_").pop() + "\" is required!","Error");
+										return;
+									}
+								}
+									
+								var value:String = el['text'];
+								if (el.id == "keywords"){
+									value = value.replace(/(\s+,+\s)|(\s+,|,+\s)|,/g, '|');
+									var tmpArr:Array = value.split("|");
+									var newValue:String = "";
+									for (var jv:uint = 0; jv<tmpArr.length; jv++){
+										newValue += "(.)*"+tmpArr[jv]+"(.)*";
+										if (jv < tmpArr.length-1)newValue+="|";
+									}
+									value = newValue;
+									
+								}else if (el.id == "channels" || el.id == "participants"){
+									value = value.replace(/(\s+,+\s)|(\s+,|,+\s)|,/g, '|');
+								}
+								
+								node.attributes['type'] = "text-single";
+								valueNodeValue = new XMLNode(3,value);
+								
+							}
+							valueNode.appendChild( valueNodeValue );
+			
+							node.appendChild( valueNode );
+							xNode.appendChild(node);
+							
+						}
+					}
+				}while (true);
+				
+				if (_idField != null){
+					var idField:XMLDocument = new XMLDocument( '<field type="'+_idField['type']+'" var="'+_idField['var']+'"><value>'+_idField['value']+'</value></field>' );
+					xNode.appendChild( idField.firstChild );
+				}
+				
+				commandNode.appendChild(xNode);
+				var iq:IQ = new IQ( new EscapedJID(_service) , IQ.TYPE_SET,null,callCallback,callCallbackError);
+				iq.xml.appendChild( new XML(commandNode) );
+				
+				 
+				muc.iqsManager.connection.send( iq );
+			}
+			private var streamEnabled:Boolean;
+			private function callCallback(iq:IQ):void {
+				
+				try {
+				
+					var data:Object = _xmlDecoder.decodeXML( new XMLDocument(iq.xml).firstChild );
+					try {
+						if (streamEnabled && _actionType == "Create"){
+							muc.iqsManager.pubsub(data.command.stream.interest,null,null);
+						}
+					}catch (error:Error){
+						
+					}
+						
+					var fieldNode:XMLNode = new XMLNode(1,"field");
+					
+					fieldNode.attributes.type = 'text-single';
+					fieldNode.attributes['var'] = 'id';
+					
+					var fieldValueNode:XMLNode = new XMLNode(1,"value");
+					var fieldValueNodeValue:XMLNode = new XMLNode(3,data.command.stream.id);
+					
+					fieldValueNode.appendChild(fieldValueNodeValue);
+					fieldNode.appendChild(fieldValueNode);
+					muc.iqsManager.streamsManager.initStreams(null,fieldNode);
+				}catch (error:Error){
+					muc.iqsManager.streamsManager.initStreams(null,null);
+				}
+				
+		
+				
+				close_clickHandler(null);
+				
+			    
+			}
+			private function callCallbackError(iq:IQ):void {
+			
+			}
+			
+			protected function addedToStage(event:Event):void
+			{
+				
+				FlexGlobals.topLevelApplication['_parslaey'].context.viewManager.addViewRoot( this );
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Scroller id="_scroller" left="0" right="0" top="0" bottom="0" >
+		
+		<s:Group  width="100%" id="_container">
+			<s:layout>
+				<s:VerticalLayout gap="7"
+								  paddingBottom="10"
+								  paddingTop="12"
+								  paddingLeft="12"
+								  paddingRight="10"/>
+			</s:layout>
+
+		</s:Group>
+	</s:Scroller>
+	
+	<s:HGroup bottom="-35" right="2">
+		<s:Button label="Cancel" click="close_clickHandler(event)"/>
+		<s:Button label="{_actionType}" click="create_clickHandler(event)"/>
+	</s:HGroup>
+</s:Group>

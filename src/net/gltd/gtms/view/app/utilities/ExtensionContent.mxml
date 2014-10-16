@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" 
+					icon="{_ico}"
+					label="{_label}"
+					width="100%" height="100%"
+					creationComplete="init(event)" xmlns:parsley="http://www.spicefactory.org/parsley"
+					>
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.app.ExtensionManager;
+			import net.gltd.gtms.events.ExtensionEvent;
+			import net.gltd.gtms.model.app.ExtensionModel;
+			import net.gltd.gtms.model.app.PluginData;
+			import net.gltd.gtms.model.dataHolder;
+			
+			import flash.utils.clearTimeout;
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Image;
+			import spark.components.Label;
+			import spark.components.Window;
+			import spark.events.IndexChangeEvent;
+		
+			[Bindable]
+			[Embed(source="../assets/skins/main_tabs_ico/plugin.png")]
+			private var _ico:Class;
+			
+			[Bindable]
+			[Embed(source="../assets/pluginadd.png")]
+			private var _addIco:Class;
+			
+			[Bindable]
+			[Embed(source="../assets/pluginrem.png")]
+			private var _RemIco:Class;
+			
+			[Bindable]
+			public var _label					:String				= "Extension";
+			
+			[Bindable]
+			public	var pluginList				:ArrayCollection	=  new ArrayCollection();
+			
+			[Bindable]
+			public	var	manager					:ExtensionManager	= ExtensionManager.getInstance();
+			
+			[Bindable]
+			private	var	removeEnabled			:Boolean = true;
+			
+			
+			private	var	tO						:uint;
+			
+			protected function init(event:FlexEvent):void
+			{
+				manager.addEventListener(ExtensionEvent.PLUGIN_REMOVED,onPluginRemoved);
+				manager.addEventListener(ExtensionEvent.PLUGIN_READY,onPluginReady);
+			}			
+			protected function onChange(event:IndexChangeEvent):void
+			{
+				
+				_content.removeAllElements();
+				_extennsionInfo.removeAllElements();
+				if ( _list.selectedItem == null) return;
+				removeEnabled = _list.selectedItem.removable;
+				if ( _list.selectedItem.settingsContent!=null){
+					_content.addElement( _list.selectedItem.settingsContent );
+				}
+				if ( (_list.selectedItem as ExtensionModel).pluginData) {
+					var _top:int = 10;
+					var pd:PluginData = (_list.selectedItem as ExtensionModel).pluginData;
+					if (pd.logo) {
+						var l:Image = new Image();
+						l.source = pd.logo;
+						l.right = 2;
+						l.top = 2;
+						l.smooth = true
+						_extennsionInfo.addElement(l);
+						
+					}
+					if (pd.copy) {
+						var cp:Label = new Label();
+						cp.text = "Copyright: "+pd.copy;
+						_extennsionInfo.addElement(cp);
+						cp.top = 33;
+						cp.left = 10;
+						_top+22 + 4;
+						
+					}
+					var an:Label = new Label();
+					an.top = 10;
+					an.left = 10;
+					an.text = pd.name + " v"+pd.version;
+					_extennsionInfo.addElement(an);
+					
+					_extennsionInfo.includeInLayout = true;
+				}else {
+					_extennsionInfo.includeInLayout = false;
+				}
+			}
+			
+			protected function onAdd(event:MouseEvent):void
+			{
+				manager.browsePlugins();
+			}
+			
+			protected function onRemove(event:MouseEvent):void
+			{
+			//	manager
+				var options:Array = [
+					{ label: "Yes", callBack:manager.removePlugin, params:[_list.selectedItem.id] },
+					{ label: "No" }
+					]
+				var w:Window = dataHolder.getInstance().openAlert("Confirm Plugin Delete. "+_list.selectedItem.id,"Are you sure you want to delete the \""+_list.selectedItem.name + "\" Plugin ?",options);
+				w.height -= 90;
+			}
+			private function onPluginRemoved(event:ExtensionEvent):void {
+				try {
+					_list.selectedItem = manager.browser.getItemAt(0);
+					
+					manager.browser.refresh();
+					
+					onChange( null );
+					for (var i:uint = 0; i< _list.dataGroup.numElements; i++){
+						if ((_list.dataGroup.getElementAt(i) as PluginListItem).id == _list.selectedItem.id){
+							(_list.dataGroup.getElementAt(i) as PluginListItem).setCurrentState("selected");
+						}else {
+							(_list.dataGroup.getElementAt(i) as PluginListItem).setCurrentState("normal");
+						}
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+				
+			}
+			private function onPluginReady(event:ExtensionEvent):void {
+				try {
+					clearTimeout(tO)
+					tO = setTimeout(function(e:ExtensionModel):void {
+						try {
+							_list.selectedItem = e;
+							onChange( null );
+							for (var i:uint = 0; i< _list.dataGroup.numElements; i++){
+								if ((_list.dataGroup.getElementAt(i) as PluginListItem).id == event.data.id){
+									(_list.dataGroup.getElementAt(i) as PluginListItem).setCurrentState("selected");
+									
+								}else {
+									(_list.dataGroup.getElementAt(i) as PluginListItem).setCurrentState("normal");
+								}
+							}
+						}catch (er:Error){
+							
+						}
+					},1600,event.data);
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+				
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<s:HGroup bottom="41" left="3" right="3" top="3">
+		<s:List width="155" height="100%"
+				change="onChange(event)"
+				creationComplete="onChange(null)"
+				selectedIndex="0"
+				contentBackgroundAlpha=".1"
+				borderVisible="false"
+				dataProvider="{manager.browser}" id="_list"
+				itemRenderer="net.gltd.gtms.view.app.utilities.PluginListItem" />
+		<s:VGroup width="100%" height="100%">
+			<s:Group id="_extennsionInfo" width="100%"/>
+			<s:SkinnableContainer backgroundAlpha=".1" backgroundColor="#FFFFFF" id="_content" width="100%" height="100%" >
+				<s:layout>
+					<s:VerticalLayout paddingBottom="10" paddingLeft="10" paddingTop="10" paddingRight="10"/>
+				</s:layout>
+			</s:SkinnableContainer>
+		</s:VGroup>
+	</s:HGroup>
+	
+	
+	
+	<s:HGroup  left="5" bottom="5" gap="4">
+		<s:Button icon="{_addIco}" styleName="smallButton" width="28" height="28" click="onAdd(event)" />
+		<s:Button icon="{_RemIco}" styleName="smallButton" width="28" height="28" click="onRemove(event)" enabled="{removeEnabled}" />
+	</s:HGroup>
+	
+</s:NavigatorContent>
+  

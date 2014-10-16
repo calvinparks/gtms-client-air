@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:utils="net.gltd.gtms.view.im.utils.*"
+				autoDrawBackground="false" rightClick="showContextMenu(event)"
+				height="52" width="100%">
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.*;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.dataHolder;
+			import net.gltd.gtms.model.im.AvatarModel;
+			import net.gltd.gtms.model.im.RoomModel;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			
+			import mx.collections.ArrayCollection;
+			import mx.effects.Resize;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.events.PropertyChangeEvent;
+			
+			import spark.components.supportClasses.TextBase;
+			
+			public override function set data(val:Object):void {
+				try { 
+					label = val.label;
+					if (data.hasOwnProperty('channel') && data.channel.hasOwnProperty('avatar') )_avatar.source = data.channel.avatar.foto;
+				}catch (e:Error){
+			 
+				}
+				super.data = val;
+			}
+		
+			private function removeMe(obj:RoomOccupant):Boolean {
+				return obj.room.connection.jid.bareJID != obj.jid.bareJID;//me.bareJID != obj.jid.bareJID; 
+			}
+	
+			protected function closeClick(event:MouseEvent):void
+			{
+				(data.room as Room).leave();
+				var e:ChatEvent = new ChatEvent(ChatEvent.CHAT_CLOSED);
+				e.id = data.id;
+				owner.dispatchEvent(e);
+				
+			}
+			private function separate():void {
+				data.openNewWindow();
+				var e:ChatEvent = new ChatEvent(ChatEvent.SEPARATED_WINDOW);
+				e.id = data.id;
+				owner.dispatchEvent(e)
+			}
+			private function moveBack():void {
+				data.openNewWindow(true);
+				var e:ChatEvent = new ChatEvent(ChatEvent.MOVE_BACK);
+				e.id = data.id;
+				owner.dispatchEvent(e);
+			}
+			private function invite():void {
+				var e:ChatEvent = new ChatEvent(ChatEvent.USER_INVITE);
+				e.id = data.id;
+				e.room = data.room
+				owner.dispatchEvent(e)
+			}
+			private function changeSubject():void {
+				var e:ChatEvent = new ChatEvent(ChatEvent.USER_CHANGE_SUBJECT);
+				e.id = data.id;
+				e.room = data.room
+				owner.dispatchEvent(e)
+			}
+			protected function showContextMenu(event:MouseEvent):void
+			{
+				//var e:ChatEvent = new ChatEvent();
+				var newItems:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = new Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem>();
+				newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Invite to Chat",null,(data.room as Room).affiliation != Room.AFFILIATION_NONE && (data.room as Room).active,false,invite) );
+				newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Leave Room",null,(data.room as Room).active,false,(data.room as Room).leave) );
+				newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Destroy Room",null,(data.room as Room).affiliation == Room.AFFILIATION_OWNER  && (data.room as Room).active,false,(data.room as Room).destroy,[""]) );
+				
+				
+				newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Change Subject",null,(data.room.role == Room.ROLE_MODERATOR),true,changeSubject));
+				var leaveCloseLabel:String;
+				if ((data.room as Room).active) leaveCloseLabel = "Leave & Close Room";
+				else  leaveCloseLabel = "Close Room";
+				newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(leaveCloseLabel,null,true,true,this.closeClick,[null]) );
+				
+				newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Change Subject",null,(data.room.role == Room.ROLE_MODERATOR),true,changeSubject));
+				
+				newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(UIphrases.OPEN_IN_SEPARATE_WINDINDOW,null,owner['dataProvider'].length > 1,false,this.separate) );
+				if (data.hasOwnWindow) newItems.push(new net.gltd.gtms.GUI.contextMenu.ContextMenuItem(UIphrases.BACK_TO_MAIN_WINDOW,null,true,false,this.moveBack) );
+				if (dataHolder.getInstance().flashVideoEnabled){
+					newItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Make Video Call",null,true,true,dataHolder.getInstance().makeVideoCall,[(data.room as Room)]));
+				}
+				
+				
+				net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu( event, newItems );
+				
+			}
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+		
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected"  stateGroups="selectedStates" />
+		<s:State name="hovered" />
+		<s:State name="down" />
+		<s:State name="hoveredAndShowsCaret" stateGroups="selectedStates" />
+	</s:states>
+	<s:Rect radiusX="4" radiusY="4" top="0" left="0" bottom="0" right="0">
+		<s:stroke>
+			<s:SolidColorStroke color="#dadee2" alpha=".85"/>
+		</s:stroke>
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry  color.selectedStates="{ styleManager.getMergedStyleDeclaration('.chatIrSelected').getStyle('backgroundColor') }"  alpha.selectedStates=".91" color.normal="{data.glowColor}" color="{ styleManager.getMergedStyleDeclaration('.chatIr').getStyle('backgroundColor') }" alpha.hovered=".9" alpha=".9"/>
+				<s:GradientEntry  color.selectedStates="{ styleManager.getMergedStyleDeclaration('.chatIrSelected').getStyle('backgroundColor') }"  alpha.selectedStates="1" color.normal="{data.glowColor}" color="{ styleManager.getMergedStyleDeclaration('.chatIr').getStyle('backgroundColor') }" alpha.hovered=".9" alpha="1"/>
+				<s:GradientEntry  color.selectedStates="{ styleManager.getMergedStyleDeclaration('.chatIrSelected').getStyle('backgroundColor') }"  alpha.selectedStates="1" color.normal="{data.glowColor}" color="{ styleManager.getMergedStyleDeclaration('.chatIr').getStyle('backgroundColor') }" alpha.hovered="1" alpha="1"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:BitmapImage width="41"
+				   height="40"
+				   smooth="true"
+				   id="_avatar"
+				   source="{AvatarModel.pathGroup}" 
+				   scaleMode="zoom" verticalAlign="middle" horizontalAlign="left" 
+				   left="6" top="6"
+				   />
+	
+	<s:Label text="{data.channel.label} ({data.room.length})" left="51" right="12" top="8" maxDisplayedLines="1" styleName="_contactItemDN" color="#000000" color.selectedStates="#FFFFFF"/>
+	<s:Label text="{data.description}" 
+			 maxDisplayedLines="2"
+			 left="51" right="17"
+			 top="25"
+			 bottom="3" 
+			 color="#969696" color.selectedStates="#a8d2f6" styleName="_contactItemStatus" />
+	<s:Image source="@Embed('../assets/close_tab.png')" mouseDown="closeClick(event)" right="5" top="5" visible="true" visible.normal="false" visible.selected="false"   buttonMode="true"/>
+
+
+	<!--s:Image right="5" bottom="5"
+			 scaleMode="stretch"
+			 smooth="true" smoothingQuality="default"
+			 id="_typing"
+			 source="{ShowStatusManager.getIco('imcomposing')}"
+			 includeInLayout="{data.bd.composing!=null}" visible="{data.bd.composing==true}" 
+			 /-->    
+	
+	
+	
+
+</s:ItemRenderer>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** ContextMenuContent.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 22, 2012 
+* 
+*
+--> 
+<s:List xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" 
+		xmlns:mx="library://ns.adobe.com/flex/mx"
+		minWidth="200" minHeight="27" mouseEnabled="false"
+		itemRenderer="net.gltd.gtms.GUI.contextMenu.ContextListItem" 
+		styleName="contextMenuContent"
+		xmlns:contextMenu="net.gltd.gtms.GUI.contextMenu.*"
+		filters="{_ds}">
+	
+	<fx:Script>
+		<![CDATA[
+			public var myParent:ContextMenuContent;
+			public var myItem:ContextListItem;
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<s:DropShadowFilter angle="49" alpha=".5" distance="3" color="0x30305a" blurX="4" blurY="4" id="_ds" />
+	</fx:Declarations>
+	<s:layout>
+		<s:VerticalLayout paddingBottom="3" paddingTop="3" paddingLeft="3" paddingRight="3" gap="1"/>
+	</s:layout>
+</s:List>

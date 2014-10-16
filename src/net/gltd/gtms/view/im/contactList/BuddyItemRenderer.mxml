@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" xmlns:utils="net.gltd.gtms.view.im.utils.*"
+				rollOver="onTT(event)"
+				rollOut="onTT(event)"
+				mouseDown="onTT(event)"
+				doubleClick="clickEvent(event)"
+				rightClick="clickEvent(event)" cacheAsBitmap="true" 
+				width="100%" maxHeight="45" >
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected" />
+		<s:State name="hovered" />
+		<s:State name="sel" />
+		<s:State name="glow" basedOn="normal" />
+		
+		<s:State name="show" />
+		<s:State name="close" />
+		
+	</s:states>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ContactEvent;
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.model.contact.GroupModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.events.FlexEvent;
+			import mx.events.ToolTipEvent;
+			
+			import spark.components.supportClasses.TextBase;
+			
+			
+			protected var tO:uint;
+			
+			//public var dataSource:Object
+			public var group:String;
+			
+			
+			[Bindable]
+			public 	var gModel:GroupModel;
+			
+			public var sortKey:int = 100;
+			
+			
+			protected function cc(event:FlexEvent):void
+			{
+				try {
+					this.setCurrentState(this.states[uint(gModel.isClosed)].name,true);
+					(_bt.skin)['_str'].rotation = uint(gModel.isClosed) * (-90);
+				}catch (error:Error){}
+			}
+			
+			
+			public override function set data(val:Object):void {
+				try {
+					
+					
+					if (val.data is GroupModel){
+						try {
+							super.data = val;
+							gModel = val.data as GroupModel;
+							if (gModel != null)	sortKey = gModel.sortKey;
+							
+							cc(null);
+						}catch  (error:Error){
+							
+						}
+					}else {
+						gModel = null;
+					
+						try {
+							//dataSource = val;
+							super.data = val.data;
+							group = val.group;
+						}catch (error:Error){
+							
+						}
+					}
+				}catch (em:Error){
+					
+				}
+				try {
+					if (val.exist === false)this.toolTip = "Add Contact";
+				}catch (er:Error){
+					
+				}
+				
+		
+			}
+				
+			private function onToolTip(event:ToolTipEvent):void {
+				var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+				e.id = data.id;
+				e.toolTip = event;
+				dispatchEvent(e);
+				
+			}
+			private function clickEvent(event:MouseEvent):void
+			{ 
+				try {
+					if (_camera.contains(event.target as DisplayObject) || event.target == _camera){
+						return;
+					}
+				}catch (error:Error){}
+				if (data.clickFunction!=null)data.clickFunction(event);
+				
+			}
+			protected function onTT(event:MouseEvent):void
+			{
+				try {
+					var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+					e.id = data.id;
+					e.mouseEvent = event;
+					if (event.type == MouseEvent.ROLL_OVER){
+						tO = setTimeout(dispatchEvent,1700,e);
+						return;
+					}
+					
+					dispatchEvent(e);
+					clearTimeout(tO);
+				}catch (error:Error){}
+				}
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+			
+		
+		/*	
+			protected function itemrenderer1_creationCompleteHandler(event:FlexEvent):void
+			{
+				try {
+					//dataSource = val;
+					super.data = data.data;
+					group = data.group;
+				}catch (error:Error){
+					
+				}
+			}
+			*/
+			
+			protected function groupClick(event:MouseEvent):void
+			{	
+				try{
+					if (gModel.clickFunction!=null) gModel.clickFunction(event,gModel);
+					
+					if (event.type == MouseEvent.CLICK){
+						gModel.isClosed = !gModel.isClosed;
+						
+						this.setCurrentState(this.states[uint(gModel.isClosed)].name,true);
+						(_bt.skin)['_str'].rotation = uint(gModel.isClosed) * (-90);
+						
+						var ce:ContactEvent = new ContactEvent(ContactEvent.GROUP_VISIBLE_CHANGE);
+						ce.visible = !gModel.isClosed;
+						ce.gropup = gModel;
+						this.owner.dispatchEvent( ce );
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Button	id="_bt" name="_group" styleName="contactGropuTitle"
+				left="0" right="0" width="100%" 
+				label="{gModel.groupName + ' ('+gModel.itemCollection.length+')'}" 
+				click="groupClick(event)" rightClick="groupClick(event)"
+				includeInLayout="{gModel!=null}" visible="{gModel!=null}"
+				/>
+	
+		<s:SkinnableContainer width="100%" height="100%" 
+							  styleName="_contactItemRendererSkin"
+							  styleName.selected="_contactItemRendererSelectedSkin"
+							  styleName.hovered="_contactItemRendererHoveredSkin" includeInLayout="{gModel==null}" visible="{gModel==null}"
+							  >
+			<s:Group width="100%" 
+					 left="3" bottom="3" top="3" right="3">
+				<s:BitmapImage
+					left="1"
+					width="40" height="40"
+					id="_avatar" scaleMode="zoom"
+					verticalAlign="middle" horizontalAlign="center"
+					source="{data.avatar.foto}"
+					smooth="true" smoothingQuality="default" />
+				
+				<utils:ShowLed showLed="{data.show}"
+							   includeInLayout="{data is IMBuddyModel || data.hasOwnProperty('show')}" visible="{ data is IMBuddyModel || data.hasOwnProperty('show') }"	
+							   left="44"
+							   top="5"
+							   />
+			
+				<s:HGroup left="{62 - Number(!(  data is IMBuddyModel || data.hasOwnProperty('show')  ))*12}" top="7" right="20" id="_labelGroup">
+					<s:Label text="{label}" maxDisplayedLines="1" width="96%"/>
+					<s:Image height="10" right="5" verticalCenter="0" id="_camera"
+							 source="{data.camera}" smooth="true" smoothingQuality="default"
+							 buttonMode="true" click="data.icoClickFunction(event)"/>
+				</s:HGroup>
+				<s:Label text="{data.status}" id="_statusLabel"
+						 styleName.selected="_contactItemStatusSelected"
+						 styleName="_contactItemStatus" 
+						 left="{62 - Number(!(data is IMBuddyModel))*12}" right="{5 + Number(data.composing==true)*26}" top="23" maxDisplayedLines="1"
+						 includeInLayout="{data.hasOwnProperty('status')}"
+						 visible="{ data.hasOwnProperty('status') }" />
+			</s:Group>
+			<s:BitmapImage height="17" width="17" right="4" top="5"
+						   scaleMode="stretch"
+						   smooth="true" smoothingQuality="default"
+						   id="_ico"
+						   source="{data.ico}"
+						   includeInLayout="{data.ico!=null}"  visible="{data.ico!=null}" />
+			
+			
+			<s:Image right="4" bottom="8"
+					scaleMode="stretch"
+					smooth="true" smoothingQuality="default"
+					id="_typing"
+					source="{ShowStatusManager.getIco('imcomposing')}"
+					includeInLayout="{data.composing!=null}" visible="{data.composing==true}" 	    />
+			
+			<mx:HRule bottom="-1" height="1" width="100%" 
+					  strokeColor="{ColorReferences.ContactsListBackgroundColor}"
+					  shadowColor="{ColorReferences.ContactsListBackgroundColor}"
+					  />
+		</s:SkinnableContainer>
+		
+	
+</s:ItemRenderer>

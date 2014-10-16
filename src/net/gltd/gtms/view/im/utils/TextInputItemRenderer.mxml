@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" maxWidth="112"
+				autoDrawBackground="false" height="21">
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.UserEvent;
+			
+			import spark.components.supportClasses.TextBase;
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+			
+			protected function removeMe(event:MouseEvent):void
+			{
+				var ue:UserEvent = new UserEvent('removeItem');
+				ue.data = data;
+			
+				owner.dispatchEvent( ue );
+					
+			}
+			
+			public override function set data(value:Object):void {
+				try {
+					super.data = value;
+					super.label = value.label;
+					if (label!=data.id)this.toolTip = label + " " + data.id;
+					else this.toolTip = label;
+				}catch (error:Error){
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Rect id="backgroundRect" left="0" top="0" right="0" bottom="0" radiusX="4" radiusY="4" >
+		
+		<s:fill>
+			<s:SolidColor color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".86"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Label text="{label}" right="17" left="4" verticalCenter="0" maxDisplayedLines="1" >
+	
+	</s:Label>
+	<s:Image source="@Embed('../assets/close_tab.png')" right="3" visible="true" verticalCenter="0"  buttonMode="true" scaleX=".85" scaleY=".85" click="removeMe(event)"/>
+
+	
+	
+</s:ItemRenderer>

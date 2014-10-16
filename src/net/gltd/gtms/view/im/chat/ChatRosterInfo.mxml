@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="64" xmlns:IM="net.gltd.gtms.view.IM.*" xmlns:ns="net.gltd.gtms.view.IM.contacts_utils.*" xmlns:im="net.gltd.gtms.view.im.*" xmlns:utils="net.gltd.gtms.view.im.utils.*">
+	<fx:Declarations>
+		<s:GlowFilter inner="true" color="#000000" blurX="16" blurY="16" strength="1" alpha="0.35" id="_ds"  />
+		<fx:String id="nickname"></fx:String>
+		<fx:String id="mail"></fx:String>
+		<fx:String id="workP"></fx:String>
+		<fx:String id="cellP"></fx:String>
+		<fx:String id="status"></fx:String>
+		<fx:String id="jid"></fx:String>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			private function onEmail(event:MouseEvent):void {
+				navigateToURL( new URLRequest("mailto:"+event.currentTarget.text) )
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:Rect id="backgroundRect" left="0" right="0" top="0" radiusX="2" radiusY="2" height="64" filters="{[_ds]}" >
+		
+		<!--s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="1">
+				<s:GradientEntry color="#5c5c5c" ratio=".5" />
+				<s:GradientEntry color="#575757" ratio=".94" />
+				<s:GradientEntry color="#5c5c5c" ratio=".77" />
+				
+			</s:LinearGradientStroke>
+		</s:stroke>
+		<s:fill>
+			<s:LinearGradient>
+				<s:GradientEntry color="#575757" />
+				<s:GradientEntry color="#5c5c5c" />		
+			</s:LinearGradient>
+		</s:fill-->
+		
+		<s:stroke>
+			<s:LinearGradientStroke rotation="90" weight="1">
+				<s:GradientEntry color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" ratio=".8" />
+				<s:GradientEntry color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" ratio=".98" />
+				
+			</s:LinearGradientStroke>
+		</s:stroke>
+		<s:fill>
+			<s:SolidColor color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+		</s:fill>
+
+	</s:Rect>
+	<s:HGroup left="10" right="10" top="10" bottom="10" gap="3">
+		<im:IMAvatar id="avatar" w="46" h="46" />
+		<utils:ShowLed id="show"  />
+		<s:VGroup width="140" paddingTop="2" right="5">
+			<s:Label text="{nickname}" fontSize="10" color="#ffffff" id="myName" />
+			<s:Label text="{status}" fontSize="9" maxWidth="135" maxHeight="30" right="5" color="#92b9dd"/>
+		</s:VGroup>
+		<mx:VRule height="100%" alpha=".8" />
+		<s:Spacer width="2"/>
+		<s:VGroup  gap="5" fontSize="10" paddingTop="2">
+			<s:Label text="E-mail:" color="#ffffff"/>
+			<s:Label text="Work:" color="#ffffff" />
+			<s:Label text="Mobile:" color="#ffffff" />
+		</s:VGroup>
+		<s:VGroup  gap="5" fontSize="10" paddingTop="2">
+			<s:Label text="{mail}" color="#a7d6fe"  click="onEmail(event)" buttonMode="true" 	/>
+			<s:Label text="{workP}" color="#a7d6fe" />
+			<s:Label text="{cellP}" color="#a7d6fe"	/>
+		</s:VGroup>
+	</s:HGroup>
+	<s:Button toolTip="Invite to Chat" right="10" bottom="10" visible="{jid.indexOf('5c40')==-1}" buttonMode="true" id="_inviteButton" styleName="chatWindowButtonSkin" />
+</s:Group>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%">
+	
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.xmpp.RosterManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.core.XMPPConnection;
+			import org.igniterealtime.xiff.data.IQ;
+			import org.igniterealtime.xiff.data.Presence;
+			
+			[Bindable]
+			private var _dataItems:ArrayCollection;
+			
+			public var data:Object;
+			public var motherIQ:IQ;
+			[Bindable]
+			public var addButton:Boolean;
+			
+			protected function init(event:FlexEvent):void
+			{
+				
+				var tmp:Array = [];
+				if ( !(data.query.x.item is Array)) data.query.x.item = [ data.query.x.item ]
+				for (var i:* in  data.query.x.item){
+					var o:Object = {};
+			
+					for (var j:* in  data.query.x.item[i].field){
+						o[data.query.x.item[i].field[j]['var']] = data.query.x.item[i].field[j]['value'];
+					
+					}
+					tmp.push(o);
+				}
+				_dataItems = new ArrayCollection( tmp );
+			}
+			
+			
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				try {
+				if (_grid.selectedItem == null || !_grid.selectedItem.jid) return;
+				
+				
+					var p:Presence = new Presence(new EscapedJID(_grid.selectedItem.jid),null,Presence.TYPE_SUBSCRIBE);
+					(XMPPConnection.openConnections[0] as XMPPConnection).send(p);
+					
+					Alert.show("Subscription Request Sent");
+				}catch (error:Error){
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<s:VGroup width="100%" height="100%">
+		<s:DataGrid dataProvider="{_dataItems}"
+					width="100%" height="100%"
+					id="_grid"
+					rollOverColor="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"
+					selectionColor="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundColor')}"
+					contentBackgroundAlpha="0" borderAlpha=".1"  borderVisible="false"
+					rowHeight="27"
+					creationComplete="init(event)"/>
+		
+		<s:Group width="100%" height="43" includeInLayout="{addButton}" visible="{addButton}">
+			<s:Button label="Add" right="5" verticalCenter="0" click="button1_clickHandler(event)" enabled="{_grid.selectedIndex>-1}" />
+		</s:Group>
+	</s:VGroup>
+	
+</s:Group>

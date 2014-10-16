@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					xmlns:utils="net.gltd.gtms.view.utils.*"
+					xmlns:view="net.gltd.gtms.view.*"
+					xmlns:parsley="http://www.spicefactory.org/parsley" 
+					icon="{_ico}"
+					label="{_label}"
+					addedToStage="init(event)"
+					>
+	
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.window.CustomWindow;
+			import net.gltd.gtms.controller.xmpp.DiscoManager;
+			import net.gltd.gtms.events.ConnectionEvent;
+			import net.gltd.gtms.events.DiscoBrowserEvents;
+			import net.gltd.gtms.model.dataHolder;
+			import net.gltd.gtms.model.xmpp.DiscoItemModel;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.rpc.xml.SimpleXMLDecoder;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.data.IQ;
+			import org.igniterealtime.xiff.data.XMLStanza;
+			import org.igniterealtime.xiff.data.XMPPStanza;
+			import org.igniterealtime.xiff.events.IncomingDataEvent;
+			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
+			import spark.events.GridSelectionEvent;
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			[Bindable]
+			[Embed(source="../assets/skins/main_tabs_ico/disco.png")]
+			private var _ico:Class;
+			
+			[Bindable]
+			public var _label:String = "Service Discovery Browser";
+			
+			[Inject][Bindable]
+			public var disco:DiscoManager;
+			
+			[Bindable]
+			private var items:ArrayCollection;
+			
+			[Bindable]
+			private var features:ArrayCollection;
+			
+			private var _xmlDecoder:SimpleXMLDecoder = new SimpleXMLDecoder();
+			
+			private var sentID:String;
+			
+			protected function init(event:Event):void
+			{
+				(FlexGlobals.topLevelApplication as Main)._parslaey.context.viewManager.addViewRoot( this );
+				this.callLater( initList );
+				
+				
+			}
+			[MessageHandler (selector="onNewServiceItem")]
+			public function initList(event:ConnectionEvent=null):void {
+				items = new ArrayCollection([]);
+				var tmp:Array;
+				try {
+					for (var i:uint = 0; i< disco.discoItems.length;i++){
+						tmp = (disco.discoItems.getItemAt(i) as DiscoItemModel).identities;
+						for (var j:uint = 0; j<tmp.length; j++){
+							tmp[j].jid = (disco.discoItems.getItemAt(i) as DiscoItemModel).jid;
+							items.addItem( tmp[j] );
+						}
+						//	items.source.concat(tmp);
+					}
+				
+				
+				}catch (error:Error){}
+				
+				disco.conn.connection.addEventListener(IncomingDataEvent.INCOMING_DATA,onIncoming);
+			}
+			private var _currentJID:EscapedJID;
+			protected function onChanged(event:GridSelectionEvent):void
+			{
+				_currentJID =  _grid.selectedItem.jid
+				
+				features = new ArrayCollection( _grid.selectedItem.features );
+				var sortField:SortField = new SortField();
+				sortField.descending = true;
+				var s:Sort = new Sort();
+				s.fields = [sortField];
+				features.sort = s;
+				//	features.filterFunction = removeWithHttp;
+				features.refresh();
+			}
+			
+			protected function onCall(event:MouseEvent):void
+			{
+				trace ("onCall",disco.conn,currentIq);
+				try {
+					var xml:XML =  new XML(_xmlPreview.text);
+					if (xml){
+						disco.conn.connection.sendXML( xml.toXMLString() );
+						sentID = xml.@id;
+					}
+				}catch (error:Error){
+					trace ("error",error.getStackTrace());
+				}
+			}
+			private function onIncoming(event:IncomingDataEvent):void {
+				try {
+					var xml:XML = new XML( event.data.toString() );
+					if (xml.@id != sentID)return;
+					var n:String = xml.name();
+					if (n=="iq"){
+						var iq:IQ = new IQ();
+						iq.xml = xml;
+						
+						iqCallBack(iq)
+					}else {
+						try {
+							_xmlResponse.text = xml.toString();
+						}catch (error2:Error){
+							_xmlResponse.text = "";
+						}
+					}
+				}catch(error:Error){
+					
+				}
+			}
+			public function getServiceItems(service:EscapedJID,action:String,callBack:Function=null,errorCallBack:Function=null):IQ {
+				var id:String = null;
+				if (currentIq!=null){
+					id = currentIq.id;
+				}
+				var iq:IQ= new IQ(service,"get",id,callBack,errorCallBack);
+				
+				var queryNode:XMLNode = new XMLNode(1,"query");
+				queryNode.attributes.xmlns = action;
+				iq.xml.appendChild( new XML(queryNode) );
+				
+				return iq;
+			}
+			public function getEmptyIQ(service:EscapedJID,type:String,action:String,callBack:Function=null,errorCallBack:Function=null):IQ {
+				var id:String = null;
+				if (currentIq!=null){
+					id = currentIq.id;
+				}
+				var iq:IQ = new IQ(service,type,null,callBack,errorCallBack);
+				return iq;
+			}
+			private function iqCallBack(iq:IQ):void {
+				try {
+					_xmlResponse.text = iq.xml.toString();
+				}catch (error2:Error){
+					_xmlResponse.text = "";
+				}
+				try {
+				
+					var obj:Object = _xmlDecoder.decodeXML( new XMLDocument(iq.xml).firstChild);
+				
+					if (obj.query.x is Array){
+						for (var j:uint = 0; j<obj.query.x.length;j++){
+							if (obj.query.x[j].hasOwnProperty('field')){
+								obj.query.x = obj.query.x[j];
+							}
+						}	
+					}
+					if (obj.query.x.type == "form"){
+						var title:String;
+						if (obj.query.x.hasOwnProperty('title'))title = obj.query.x.title;
+						else title = "hmm";
+						var wind:CustomWindow = dataHolder.getInstance().getWindow(title,true,"none",550,490,true,true,true,true) as CustomWindow;
+						var form:DiscoFields = new DiscoFields();
+						form.addEventListener(DiscoBrowserEvents.IQ_READY_TO_SEND,onIqReady)
+						if (obj.query.hasOwnProperty('instructions'))form.title = obj.query.instructions;
+						form.data = obj.query;
+						form.jid = iq.from;
+						form.motherIQ = iq;
+						wind._container.addElement( form );
+					}
+					if (obj.query.x.type == "result"){
+						if (!obj.query.x.item)return;
+						var wind2:CustomWindow = dataHolder.getInstance().getWindow(iq.from.bareJID,true,"none",580,490,true,true,true,true) as CustomWindow;
+						var table:DiscoTable = new DiscoTable();
+						table.data = obj;
+						table.motherIQ = iq;
+						
+						wind2._container.addElement(table);
+						trace ("iq.xml.children().namespace()",iq.xml.children().namespace());
+						
+						if ( iq.xml.children().namespace().toString() == "jabber:iq:search" && iq.from.bareJID.indexOf("search") == 0){
+							table.addButton = true;
+						}
+					}
+				}catch (error:Error){
+				//	trace (error.getStackTrace());
+				}
+			}
+			private function removeWithHttp(o:String):Boolean {
+				return o.indexOf("http") == -1;
+			}
+			
+			protected function _list_changeHandler(event:IndexChangeEvent):void
+			{
+				_type.selectedIndex = 0;
+				currentIq = getServiceItems( _currentJID, _list.selectedItem.varName, iqCallBack,iqCallBack);
+				//currentNode = currentIq.xml.children()[0].toString();
+				
+				//currentNode = new XMLDocument( currentIq.xml.toString() ).firstChild.toString();
+				currentNode = new XMLDocument(currentIq.xml.toString()).firstChild.childNodes[1];
+				trace  (" new XMLDocument(currentIq.xml.toXMLString()).firstChild.[]", new XMLDocument(currentIq.xml.toString()).firstChild.childNodes);
+				trace  (" new XMLDocument(currentIq.xml.toXMLString()).firstChild.firstChild", new XMLDocument(currentIq.xml.toString()).firstChild.firstChild);
+					
+				_xmlPreview.text = currentIq.xml.toString();
+				
+			}
+		
+			[Bindable]
+			protected var currentIq:IQ;
+			
+			[Bindable]
+			protected var currentNode:String;
+			
+			[Bindable]
+			protected var currentType:String;
+			
+			
+			protected function _list_creationCompleteHandler(event:FlexEvent):void
+			{
+				_list.addEventListener(DiscoBrowserEvents.FIELD_ITEM_CLICK,onFieldItemClick);
+			}
+			private function onFieldItemClick(event:DiscoBrowserEvents):void {
+				try {
+					var iq:IQ = getServiceItems( _currentJID, (event.data as String), iqCallBack,iqCallBack);
+					disco.conn.send(iq);
+				}catch (error:Error){
+					trace ("error",error.getStackTrace());
+				}
+			}
+		 	private function onIqReady(event:DiscoBrowserEvents):void {
+				event.iq.callback = iqCallBack;
+				event.iq.errorCallback = iqCallBack;
+				disco.conn.send(event.iq);
+			}
+			protected function onIqFormCallBack(iq:IQ):void {
+				try {
+					var obj:Object = _xmlDecoder.decodeXML(new XMLDocument(iq.xml).firstChild);
+					if (!obj.query.x.item)return;
+					var wind:CustomWindow = dataHolder.getInstance().getWindow("",true,"none",550,490,true,true,true,true) as CustomWindow;
+					var table:DiscoTable = new DiscoTable();
+					table.data = obj;
+					wind._container.addElement(table);
+				}catch (error:Error){trace (error.getStackTrace())}
+			}
+		
+			
+			protected function _typr_changeHandler(event:IndexChangeEvent):void
+			{
+				_node_changeHandler(null);
+			}
+			protected function _node_changeHandler(event:TextOperationEvent):void
+			{
+				
+				currentIq = getEmptyIQ( _currentJID, _type.selectedItem, _list.selectedItem, iqCallBack,iqCallBack);
+				currentIq.xml.appendChild(new XML(_node.text));
+				currentNode = new XMLDocument(currentIq.xml.toString()).firstChild.childNodes[1];
+				_xmlPreview.text = currentIq.xml.toString();
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	<!--s:List dataProvider="{disco.discoItems}" itemRenderer="net.gltd.gtms.view.utils.DiscoBrowserItemrenderer" contentBackgroundAlpha="0" width="100%" height="100%"/-->
+	<mx:VDividedBox width="100%" height="100%" verticalGap="5" top="3" bottom="2">
+		<s:Group width="100%"  minHeight="160" height="100%">
+			<s:DataGrid id="_grid" width="100%" height="100%" borderAlpha=".1" borderVisible="false"
+						contentBackgroundAlpha="0" dataProvider="{items}"
+						rollOverColor="{styleManager.getMergedStyleDeclaration('.listItemrendererHover').getStyle('backgroundColor')}"
+						rowHeight="27" selectionChange="onChanged(event)"
+						selectionColor="{styleManager.getMergedStyleDeclaration('.listItemrendererSelected').getStyle('backgroundColor')}">
+				
+				<s:columns>
+					
+					<s:ArrayList> 
+						<s:GridColumn dataField="name" headerText="Name"  /> 
+						<s:GridColumn dataField="jid" headerText="JID"/> 
+						<s:GridColumn dataField="category" headerText="Category" /> 
+						<s:GridColumn dataField="type" headerText="Type" /> 
+					</s:ArrayList> 
+				</s:columns>
+			</s:DataGrid>
+		</s:Group>
+	
+		
+		<s:SkinnableContainer width="100%" height="390" minHeight="220" includeInLayout="{!(features==null || features.length==0)}" visible="{!(features==null || features.length==0)}" backgroundAlpha=".1" backgroundColor="#FFFFFF">
+		
+			<s:layout>
+				<s:VerticalLayout paddingBottom="4" paddingLeft="4" paddingRight="4" gap="5"/>
+			</s:layout>
+			<mx:HRule width="100%"/>
+			<s:Spacer height="1" />
+			<s:Label fontWeight="bold" text="Features:"/>
+			<s:List 
+					doubleClickEnabled="true"
+					change="_list_changeHandler(event)"
+					dataProvider="{features}"
+					id="_list"
+					creationComplete="_list_creationCompleteHandler(event)"
+					width="100%" height="31%"
+					borderVisible="false"
+					contentBackgroundAlpha=".12" contentBackgroundColor="#FFFFFF"
+					itemRenderer="net.gltd.gtms.view.utils.DiecoFeatureItem"  />
+			<s:Spacer height="1"/>
+			<s:HGroup width="100%" verticalAlign="middle">
+				<s:DropDownList itemRenderer="net.gltd.gtms.view.DropDownItemRenderer" selectedIndex="0" id="_type" width="90" change="_typr_changeHandler(event)">
+					<mx:ArrayCollection>
+						<fx:String>get</fx:String>
+						<fx:String>set</fx:String>
+					</mx:ArrayCollection>
+				</s:DropDownList>
+				<s:TextInput id="_node" width="100%" text="{currentNode}" change="_node_changeHandler(event)"/>
+				<s:Button right="0" label="Send" click="onCall(event)" enabled="{_node.text.length>0}" />
+			</s:HGroup>
+			<mx:VDividedBox width="100%" height="100%" verticalGap="5" top="3" bottom="2">
+				<s:TextArea id="_xmlPreview" styleName="_console" editable="true"  contentBackgroundAlpha="0.9" borderVisible="false" width="100%" height="100%"/>
+				<s:VGroup width="100%" height="50%">
+					<s:Label fontWeight="bold" text="Response:"/>
+					<s:TextArea id="_xmlResponse" styleName="_console" editable="false" contentBackgroundAlpha="0.9" borderVisible="false" width="100%" height="100%"/> 
+				</s:VGroup>
+			</mx:VDividedBox>
+		</s:SkinnableContainer>
+	</mx:VDividedBox>
+	
+	
+	
+	
+	
+</s:NavigatorContent>

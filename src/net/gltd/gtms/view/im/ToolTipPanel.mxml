@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Window xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="300" height="200" maxWidth="430" minWidth="200"
+		 type="{NativeWindowType.LIGHTWEIGHT}" systemChrome="none" showStatusBar="false"  transparent="true"
+		 fontSize="11" mouseChildren="false" mouseEnabled="false" styleName="toolTipPanel"
+		 implements="mx.core.IToolTip">
+	 <!--s:Panel xmlns:fx="http://ns.adobe.com/mxml/2009"
+	xmlns:s="library://ns.adobe.com/flex/spark"
+	xmlns:mx="library://ns.adobe.com/flex/mx"
+	width="100%" height="100%" minWidth="190" minHeight="10" maxHeight="330"
+	backgroundAlpha="0.89" backgroundColor="#152E4B" borderAlpha="0.4" borderColor="#FFFFFF"
+	borderVisible="false" chromeColor="#E77B12" color="#FFFFFF" contentBackgroundAlpha="0.5"
+	contentBackgroundColor="#152E4B" cornerRadius="2" creationComplete="init()" fontSize="11"
+	implements="mx.core.IToolTip" skinClass="com.pinczo.unify.skins.ContactToolTipSkin"-->
+
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.utils.clearTimeout;
+			import flash.utils.setTimeout;
+			
+			import mx.core.FlexGlobals;
+			import mx.core.IWindow;
+			
+			import spark.components.Image;
+			[Bindable]
+			public var avatarSource:ByteArray;
+			
+			[Bindable]
+			public var bodyText:String;
+			
+			
+			public var items:Array = []
+			public var _text:String;
+			
+			private var tO:uint = 0;
+			
+			
+			private var _avatarSource:Object;
+			[Bindable]
+			public function get avatar():Object {
+				return _avatarSource;
+			}
+			public function set avatar(val:Object):void {
+				try {
+					_avatarSource = val;
+					var w:int = _avatarSource.width;
+					var h:int = _avatarSource.height;
+					var maxW:int = 120;
+					var maxH:int = 150;
+					var p:Number
+					if (w>maxW){
+						p = maxW/w;
+						w *= p;
+						h *= p;
+					}
+					if (h>maxH){
+						p = maxH/h;
+						w *= p;
+						h *= p;
+					}
+					_avatar.width = w;
+					_avatar.height = h;
+				}catch (error:*){
+					
+				}
+			}
+			public function preInit():void {
+				try {
+					
+					_avatar.width = 0;
+					_avatar.height = 0;
+					
+					
+					bodyText = "";
+					avatar = null;
+					
+					for (var i:uint = 0; i<items.length;i++){
+						_textCont.removeElement(items[i])
+					}
+					_bottomCont.removeAllElements()
+					items = [];
+					
+					clearTimeout(tO);
+				}catch (error:Error){
+					
+				}
+			}
+			public override function set visible(b:Boolean):void {
+				super.visible = b;
+				clearTimeout(tO);
+			}
+			public function init():void {
+				for (var i:uint = 0; i<items.length;i++){
+					_textCont.addElement(items[i])
+				};
+				//this.setActualSize(grp.width+30,grp.height+30)
+				setTimeout(setSize,40);
+				tO = setTimeout(setVis,300);
+					
+			}
+			private function setVis():void {
+				this.visible = true;
+				this.orderInFrontOf(FlexGlobals.topLevelApplication as IWindow)
+			}
+			private function setSize():void {
+				this.width = _main.width + 20;
+				this.height = _main.height + 20;
+			}
+			public function get text():String { 
+				return _text; 
+			} 
+			public function set text(value:String):void {
+				_text = value;
+				
+			} 
+		
+			
+			
+		]]>
+	</fx:Script>
+	<s:VGroup id="_main" top="10" left="10" gap="2">
+		<s:Label text="{title}" color="#fafaff"/>
+		<s:Spacer height="3"/>
+		<mx:HRule width="100%" alpha=".7"/>
+		<s:Spacer height="7"/>
+		<s:HGroup mouseChildren="false" id="grp" verticalAlign="top" horizontalAlign="left">
+			<s:Image id="_avatar"   horizontalAlign="left" verticalAlign="top" smoothingQuality="high" smooth="true" minWidth="1"   source="{avatar}" />
+			<s:VGroup id="_textCont" > 
+				<s:RichText text="{bodyText}" minHeight="1" id="bt"  />
+			</s:VGroup>
+		</s:HGroup>
+		<s:Spacer height="4"/>
+		<s:HGroup id="_bottomCont" verticalAlign="top" width="100%"  />
+		</s:VGroup>
+	<!--s:Image source="{avatarSource}" visible="false" id="tmpIMG" width="110"/-->
+</s:Window>

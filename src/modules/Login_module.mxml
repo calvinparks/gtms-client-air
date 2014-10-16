@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** Login_module.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.1 
+*	 Created: Jun 11, 2012 
+* 
+*
+--> 
+<s:Module 
+		xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" 
+		xmlns:mx="library://ns.adobe.com/flex/mx" 
+		xmlns:app="net.gltd.gtms.controller.app.*" 
+		xmlns:parsley="http://www.spicefactory.org/parsley"
+		keyDown="onKeyDown(event)"
+		width="100%" height="100%"
+		addedToStage="ats(event)" removedFromStage="rfs(event)"
+		  >
+
+
+	<fx:Script>
+		
+		<![CDATA[
+			import net.gltd.gtms.controller.im.LoginManager;
+			
+			import mx.core.FlexGlobals;
+			
+			import beans.LoginParsleyBeans;
+			
+			import org.spicefactory.parsley.core.context.Context;
+			import org.spicefactory.parsley.flex.FlexContextBuilder;
+			
+			
+			
+			[Inject][Bindable]
+			public	var		manager				:LoginManager;
+			public	var		context				:Context;
+			protected function onKeyDown(event:KeyboardEvent):void
+			{
+				if (event.keyCode == 13 && !manager._inProgress) manager.login();
+				
+			}
+			
+			protected function ats(event:Event):void
+			{
+				
+				context = FlexContextBuilder.build(LoginParsleyBeans,this,FlexGlobals.topLevelApplication['_parslaey'].context);
+				context.viewManager.addViewRoot( this );
+			}
+			protected function rfs(event:Event):void
+			{
+				context.viewManager.removeViewRoot(this);
+				context.destroy();
+				context = null;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<parsley:Configure	/>
+	</fx:Declarations>
+
+	<s:SkinnableContainer width="100%" height="100%" styleName="_mainBackgroundContainer" >
+		<s:layout>
+			<s:VerticalLayout paddingLeft="22" paddingRight="22" paddingTop="27" paddingBottom="17" />
+		</s:layout>
+		<s:Label id="_userNameLabel" width="100" text="{manager.userName}" />
+		<s:TextInput id="_userNameInput"  width="100%" text="@{manager._user}"/>
+		<s:Spacer height="4"/>
+		<s:Label id="_passwordLabel" width="100%" text="{manager.password}" />
+		<s:TextInput id="_passwordInput" width="100%" displayAsPassword="true" text="@{manager._pass}" />
+		<s:Spacer height="4"/>
+		<s:Label id="_serverLabel" width="100%" text="{manager.server}" />
+		<s:TextInput id="_serverInput" width="100%" text="@{manager._server}" />
+		<s:Spacer height="4"/>
+		<s:Label id="_profileLabel" width="100%" text="{manager.profile}" />
+		<s:ComboBox id="_profileList" color="#000000" width="100%" dataProvider="{manager.profiles}"
+					itemRenderer="net.gltd.gtms.view.DropDownItemRenderer" selectedItem="@{manager._profile}"
+					selectedIndex="0" focusEnabled="false" tabEnabled="true" tabChildren="true"/>
+		<s:Spacer height="11"/>
+		<s:Button id="_loginButton" buttonMode="true" width="70" label="{manager.loginButton}" click="manager.login()" enabled="{!manager._inProgress}" />
+	
+		<s:Spacer height="10"/>
+	
+		<s:VGroup id="chboxs" >
+			<s:CheckBox id="_rememberMe"	buttonMode="true"	label="{manager.remember}" selected="@{manager._rememberMe}"	/>
+			<s:CheckBox id="_autoSign"		buttonMode="true"	label="{manager.autoSing}" selected="@{manager._autoSign}"	/>
+			<s:CheckBox id="_autoOpen"		buttonMode="true"	label="{manager.autoOpen}" selected="@{manager._autoOpen}"	/>
+		</s:VGroup>
+		<s:Spacer height="10"/>
+		<s:Label id="msg" styleName="messageLabel" text="{manager._loginMessage}" />
+
+	</s:SkinnableContainer>
+	
+</s:Module>

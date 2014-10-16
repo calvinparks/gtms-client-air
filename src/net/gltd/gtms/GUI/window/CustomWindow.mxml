@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Window xmlns:fx="http://ns.adobe.com/mxml/2009"
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:app="net.gltd.gtms.view.app.*"
+		  xmlns:app1="net.gltd.gtms.controller.app.*"
+		  styleName="customWindow"
+		  width="300" height="400"
+	      minWidth="90" minHeight="90"
+		  closeEffect="{hideEff}" creationComplete="init(event)" moving="window1_movingHandler(event)" activate="window1_activateHandler(event)"
+		  maximizable="false" minimizable="true" resizable="true" showStatusBar="false"
+		  systemChrome="none" transparent="true" dragEnter="window1_dragOverHandler(event)" >
+	<fx:Declarations>
+		
+		<s:Sine id="powerEasing" easeInFraction=".2"/>
+		<s:Parallel id="showEff" duration="290" >
+			<s:Fade alphaFrom="0.0" alphaTo="1.0" easer="{powerEasing}" />
+			<s:Rotate3D angleXFrom="-30" angleXTo="0" easer="{powerEasing}" />
+			
+		</s:Parallel>
+		<s:Parallel id="hideEff" duration="340">
+			<s:Fade alphaFrom="1.0" alphaTo="0.0" easer="{powerEasing}" />
+			<s:Rotate3D angleXFrom="0" angleXTo="15" />
+		</s:Parallel>
+		
+		<s:DropShadowFilter angle="50" blurX="4" blurY="4" alpha=".43" distance="2" color="#323232" id="_ds"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.app.WindowManager;
+			
+			import flash.utils.clearTimeout;
+			import flash.utils.setTimeout;
+			
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.MoveEvent;
+			
+			private		var 	_minimizable:Boolean;
+			private		var		_maximizable:Boolean
+			
+			private		var		_closeable				:Boolean = true;
+			
+			public		var 	contentBackgrouond		:Boolean = true;
+
+			[Bindable]
+			public		var		info					:Boolean = false;
+			[Bindable]
+			public		var		moveable				:Boolean = true;
+			[Bindable]
+			public		var		imgSource				:* = null;
+			[Bindable]
+			public		var		windowManager			:WindowManager = new WindowManager();
+							
+			
+			protected function init(event:FlexEvent):void
+			{
+				windowManager.natWindow = this.nativeWindow;
+				windowManager.window = this;
+				if (contentBackgrouond)_container.styleName = "_mainBackgroundContainer";
+				
+				
+			}
+			public override function set maximizable(value:Boolean):void {
+				super.maximizable = value;
+				if ( isNaN(windowManager.maxEnabled)) windowManager.maxEnabled = Number(value);
+				_maximizable = value;
+			}
+			[Bindable]
+			public override function get maximizable():Boolean {
+				return _maximizable;
+			}
+			public override function set minimizable(value:Boolean):void {
+				super.minimizable = value;
+				if ( isNaN(windowManager.minEnabled)){
+					windowManager.minEnabled = Number(value);
+				}
+				_minimizable = value;
+			}
+			[Bindable]
+			public override function get minimizable():Boolean {
+				return _minimizable;
+			}
+			public function setClosable(value:Boolean):void {
+				closeable = value
+				if ( isNaN(windowManager.closeEnabled) )windowManager.closeEnabled = Number(value);
+			}
+			public function set closeable(value:Boolean):void {
+				_closeable = value;
+			
+			}
+			[Bindable]
+			public function get closeable():Boolean {
+				return _closeable;
+				
+			}
+
+			
+		
+			
+			protected function window1_dragOverHandler(event:DragEvent):void
+			{
+				this.orderToFront();
+			}
+			
+			
+			protected var moveTimer:uint;
+			protected function window1_movingHandler(event:NativeWindowBoundsEvent):void
+			{
+				clearTimeout( moveTimer );
+				moveTimer = setTimeout(savePosition,300);
+				
+			}
+			
+			protected function window1_activateHandler(event:Event):void
+			{
+				trace ("activate");
+			}
+			private function savePosition():void {
+				if (this.id != null && this.name != null){
+					SettingsManager.setWindowPosition( this.name , new Point(this.nativeWindow.x,this.nativeWindow.y) );
+				}
+			
+			}
+			
+		]]>
+	</fx:Script>
+	<app:TopBar windowManager="{windowManager}"
+				closeable="{closeable}"
+				moveable="{moveable}"
+				info="{info}"
+				minimizable="{minimizable}"
+				maximizable="{maximizable}"
+				imgSource="{imgSource}"
+				winTitle="{title}" id="_titleBar"/>
+	
+	<s:SkinnableContainer	id="_container" filters="{_ds}"
+							width="100%" left="10" top="35" bottom="10" right="10"
+							height="100%"
+							>
+	</s:SkinnableContainer>
+	
+</s:Window>

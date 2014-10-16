@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%">
+	
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.DiscoBrowserEvents;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.data.IQ;
+			
+			import spark.components.CheckBox;
+			import spark.components.DropDownList;
+			import spark.components.FormHeading;
+			import spark.components.FormItem;
+			import spark.components.Label;
+			import spark.components.TextInput;
+			import spark.components.Window;
+			[Bindable]
+			public var title:String;
+			public var data:Object;
+			public var jid:EscapedJID;
+			public var motherIQ:IQ;
+			
+			private var _forms:Array = [];
+			
+			protected function init(event:FlexEvent):void
+			{
+				try {
+					if (data.x.hasOwnProperty('instructions') && data.x['instructions'].toString().toLowerCase() != "instructions"){
+						var header:FormHeading = new FormHeading();
+						header.percentWidth = 90;
+						header.label = data.x['instructions'].toString();
+						_form.addElement(header);
+					}
+					(data.x.field as Array).sortOn("type",[Array.DESCENDING])
+					for (var i:uint = 0; i<data.x.field.length; i++){
+						if ( data.x.field[i].type == "hidden") continue;
+						var fi:FormItem = new FormItem();
+						fi.percentWidth = 90;
+						fi.verticalCenter = 0;
+						//fi.helpContent = [];
+						fi.required = data.x.field[i].hasOwnProperty('required') && data.x.field[i]['required'] != "false"
+						fi.label = data.x.field[i].label;
+						var hc:Label = new Label();
+						if ( data.x.field[i].type.indexOf("text") == 0 ){
+							var ti:TextInput = new TextInput();
+							ti.id = data.x.field[i]['var'];
+							ti.displayAsPassword = data.x.field[i].type == "text-private";
+							if (data.x.field[i].value)ti.text = data.x.field[i].value;
+							data.x.field[i].formD = ti;
+							fi.addElement(ti);
+							
+							
+							
+						}else if ( data.x.field[i].type == "boolean" ){
+							var chb:CheckBox = new CheckBox();
+							chb.id = data.x.field[i]['var'];
+							if (data.x.field[i].value)chb.selected = Boolean( Number(data.x.field[i].value) );
+							data.x.field[i].formD = chb;
+							fi.addElement(chb);
+							
+						}else if (data.x.field[i].type.indexOf ("list") == 0){
+							var list:DropDownList = new DropDownList();
+							if (data.x.field[i].option is Array){
+								list.dataProvider = new ArrayCollection( data.x.field[i].option );
+							}else {
+								list.dataProvider = new ArrayCollection( [data.x.field[i].option] );
+							}
+							list.selectedIndex = 0;
+							fi.addElement(list);
+							if (data.x.field[i].value == undefined)data.x.field[i].value = list.selectedItem;
+							
+							BindingUtils.bindProperty(data.x.field[i].value,"value", list.selectedItem,"value");
+						}else {
+							continue;
+						}
+						_form.addElement(fi);
+						
+					}
+					
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+			}
+			
+			protected function onSend(event:MouseEvent):void
+			{
+				var iq:IQ = new IQ(jid,"set",null); 
+				var nodes:String = "<query xmlns='"+motherIQ.xml.children().namespace()+"'>";
+				var xns:String= "jabber:x:data";
+				for each (var _x:XML in motherIQ.xml.children().children()){
+					if (_x.localName() == "x") {
+						xns = _x.namespace();
+					}
+				}
+			 
+				nodes += "<x xmlns='"+xns+"' type='submit'>";
+				for (var i:uint = 0; i<data.x.field.length; i++){
+					if (data.x.field[i].hasOwnProperty('formD')){
+						nodes += "<field var='"+data.x.field[i]['var']+"'><value>";
+						if (data.x.field[i]['formD'].hasOwnProperty("text")){
+							nodes+=data.x.field[i]['formD']['text']
+						}else if (data.x.field[i]['formD'].hasOwnProperty("selected")){
+							nodes+= Number(data.x.field[i]['formD']['selected']).toString();
+						}
+						nodes+="</value></field>";
+					}else {
+						nodes += "<field var='"+data.x.field[i]['var']+"' type='"+data.x.field[i]['type']+"'><value>";
+						nodes+=data.x.field[i]['value'];
+						nodes+="</value></field>";
+					}
+				}
+				nodes+="</x></query>";
+			
+				var node:XMLNode;
+				try {
+					node = new XMLDocument(nodes).firstChild;
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+
+				if (node == null)return; 
+				iq.xml.appendChild(new XML(node));
+				
+				var ev:DiscoBrowserEvents = new DiscoBrowserEvents(DiscoBrowserEvents.IQ_READY_TO_SEND);
+				ev.iq = iq;
+				dispatchEvent(ev);
+				
+				(this.parentApplication as Window).close();
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Scroller left="0" right="0" top="0" bottom="22" horizontalScrollPolicy="off"  >
+		<s:viewport>
+			<s:Group width="100%">
+			<s:Form id="_form" creationComplete="init(event)" width="90%" >
+				<s:layout>
+					<s:FormLayout/>
+				</s:layout>
+			</s:Form>
+			</s:Group>
+		</s:viewport>
+	
+	</s:Scroller>
+
+	<s:Button label="Send" bottom="8" right="8" click="onSend(event)"/>
+</s:Group>

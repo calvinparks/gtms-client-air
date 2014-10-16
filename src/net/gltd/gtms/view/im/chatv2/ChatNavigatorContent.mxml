@@ -1,0 +1,714 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					xmlns:utils="net.gltd.gtms.view.im.utils.*"
+					width="100%" height="100%" xmlns:chatv2="net.gltd.gtms.view.im.chatv2.*"
+					creationComplete="init(event)"
+					>
+	<fx:Declarations>
+	 
+		
+		<s:Animate id="anim" target="{msgScroll.viewport}" duration="200" startDelay="0" repeatDelay="0" >
+			<s:motionPaths>
+				<s:SimpleMotionPath id="pth" property="verticalScrollPosition" />
+			</s:motionPaths>
+		</s:Animate>
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.Emoticons;
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.xmpp.ArchiveManager;
+			import net.gltd.gtms.events.ArchiveEvent;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.im.MessageModel;
+			import net.gltd.gtms.utils.StringUtils;
+			
+			import flash.utils.setTimeout;
+			
+			import flashx.textLayout.elements.DivElement;
+			import flashx.textLayout.elements.InlineGraphicElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.controls.DateField;
+			import mx.events.FlexEvent;
+			import mx.events.PropertyChangeEvent;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.core.XMPPConnection;
+			import org.igniterealtime.xiff.data.Message;
+			
+			import spark.components.Window;
+		
+			[Bindable]
+			private			var			email					:String;
+			
+			[Bindable]
+			public 			var			jid						:String;
+			
+			[Bindable]
+			private			var			_msgTF					:TextFlow = new TextFlow();
+			
+			[Bindable]
+			private			var			_msgTFHist				:TextFlow = new TextFlow();
+			
+			 
+			
+			[Bindable]
+			public			var			rightMargin				:int = 11,
+			
+										_model					:MessageModel,
+			
+										_hasUnreaded			:Boolean,
+			
+										_selected				:Boolean,
+		
+										_lastMsg				:Object		= {user:"",date:"",readed:false},
+										_lastEntry				:DivElement,
+										_colors					:Object = {
+											me: {t:0x14478e,b:SettingsManager.CHAT_COLOR},
+											buddy: {t:0xd84f0c,b:SettingsManager.CHAT_COLOR},
+											info : {t:0x08F8F8F, b:0x08F8F8F}
+										},
+										_today					:Date = new Date(),
+										
+										_state					:String = Message.STATE_ACTIVE,
+										_stateTimer				:Timer = new Timer (400),
+										_stillTyping			:Boolean = false,
+										
+										_emoticons				:Emoticons = Emoticons.getInstance(),
+											
+										typingParagraph			:ParagraphElement,
+										archiveParagraph		:DivElement,
+										
+										_moveScroll				:Boolean = false,
+										
+										_hasHistory				:Boolean,
+										
+										vebennhere				:Boolean = false,
+										scrollinginprogress		:Boolean;
+
+										
+
+			
+			[Bindable][Embed(source="../assets/dot.png")]
+			private var dot:Class;
+			
+			private var gettingArchiveInProgress:Boolean = false;
+			
+			public function set model( m:MessageModel ):void {
+				_model = m;
+			
+				try {
+					model.addEventListener(ChatEvent.NEW_MESSAGE, onNewIncomingMessage);
+					jid = model.id;
+				
+					label = model.label;
+					model.description = model.bd.status;
+					model.bd.addEventListener("composingChanged",onComposing);
+					
+					model.addEventListener(ArchiveEvent.CONVERSATION_READY,onConversationReady);
+					model.addEventListener(ArchiveEvent.CONVERSATION_ERROR,onConversationReady);
+				
+					var msg:Message;
+					var from:String;
+					var l:uint = model.readed.length;
+					
+					
+					for (var i:uint = 0; i<l;i++){
+						msg = model.readed[i];
+						if (msg.from != null && msg.from.bareJID.length > 0)from = "buddy";
+						else from = "me";
+						shapeMessage(msg,from,true);
+					}
+					l = model.messages.length;
+					for (i = 0; i<l;i++){
+						msg = model.getMessage();
+						if (msg.from != null && msg.from.bareJID.length > 0)from = "buddy";
+						else from = "me";
+						shapeMessage(msg,from,false);
+					}
+					email = m.bd.vCard.email;
+					
+					typingParagraph = _emoticons.showTyping(label);
+					
+					
+				}catch (error:Error){}
+				
+				
+			}
+			private function onConversationReady(event:ArchiveEvent):void {
+				if (event.type == ArchiveEvent.CONVERSATION_ERROR){
+					gettingArchiveInProgress = false;
+					return;
+				}
+				
+				callLater(addArchiveMessages,[model.archives]);
+				model.sesionAllArchives =  model.archives.concat(model.sesionAllArchives);
+			}
+			
+
+			private function addArchiveMessages(source:Array):void 
+			{
+				
+				var oldContentHeight:Number; 
+				var archiveScopeHeight:Number;
+				try {
+					oldContentHeight = msgScroll.viewport.contentHeight;
+					archiveScopeHeight = archiveScope.height;
+				}catch (error:Error){
+					oldContentHeight = 0;
+					archiveScopeHeight = model.archiveBeforeValueHeight;
+				}
+				try {
+					for (var i:int = source.length - 1; i>=0; i--){
+						var m:Message = new Message();
+						
+						var from:String;
+						if ( source[i].jid != undefined ){
+							m.from = new EscapedJID( source[i].jid );
+							from = "buddy";
+						}else {
+							from = "me";
+						}
+						m.body = source[i].body;
+						if (!source[i].time)source[i].time = ArchiveManager.convertToDate( model.archiveStart, Number(source[i].secs) );
+						
+						shapeMessage (m,from,true,true,source[i].time);
+					}
+					onHeightChanged(null);
+			 		
+	
+				
+					if (!vebennhere){
+						vebennhere = true;
+						scrollDown(true,true,90);
+						
+					}else {
+						callLater(function():void {
+							try {
+								anim.stop();
+								var newContentHeight:Number = Math.abs(oldContentHeight - msgScroll.viewport.contentHeight);
+								msgScroll.viewport.verticalScrollPosition += (newContentHeight);
+							}catch (error:Error){}
+							
+						});
+					}
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+				gettingArchiveInProgress = false;
+			}
+		 
+			private function onComposing(event:Event):void {
+				try {
+					if (model.bd.composing){
+						_msgTF.addChild( typingParagraph );
+					}else {
+						_msgTF.removeChild( typingParagraph );
+					}
+					callLater(scrollDown,[moveScroll] );
+				}catch (error:Error){}
+			}
+			[Bindable]
+			public function get model( ):MessageModel {
+				return _model
+			}
+			
+			[Bindable]
+			public override function get label():String
+			{
+				try {
+					return model.bd.nickname;
+				}catch (error:Error){}
+				return super.label;
+			}
+			
+			public override function set label(l:String):void
+			{
+				 super.label = l
+			}
+			
+			protected var lastMsgText:String;
+			protected function onInput(event:TextEvent):void
+			{
+
+				if ( _outgoingMsgField.text.length < 1) {
+					_stillTyping = false;
+					state = Message.STATE_ACTIVE;
+				}
+				_stillTyping = true;
+				if (state != Message.STATE_COMPOSING){
+					state = Message.STATE_COMPOSING;
+					if (!_stateTimer.running)_stateTimer.start();
+				}
+				
+			}
+			
+			
+			protected function onKeyDown(event:KeyboardEvent):void
+			{
+				if (event.keyCode == 13 && !event.shiftKey){
+					callLater(send);
+				}
+			}
+			public function send():void {
+				var msg:String =  _outgoingMsgField.text.toString();
+			
+				if (msg.charAt( _outgoingMsgField.selectionActivePosition - 1) == "\n"){
+					msg =  msg.slice(0,_outgoingMsgField.selectionActivePosition-1)+msg.slice(_outgoingMsgField.selectionActivePosition,msg.length);
+				}
+				
+				_outgoingMsgField.text = "";
+				if (StringUtils.removeChar( msg,"\n").length == 0)return;
+				if (StringUtils.removeChar( msg," ").length == 0)return;
+				
+				msg = removeBRs(msg);
+				model.sendMessage(msg);
+				displayMessage("Me",new Date(),msg,"me",false);
+			
+			}
+			private function removeBRs(str:String):String {
+				if (str.lastIndexOf("\n") == str.length-1){
+					str = str.slice(0, str.lastIndexOf("\n") );
+					return  removeBRs(str);
+				}
+				return str;
+			}
+			protected function onCreationComplete(event:FlexEvent):void
+			{
+				(_outgoingMsgField.parentApplication)['activate']();
+				_outgoingMsgField.setFocus();
+
+			}
+			
+			private function onNewIncomingMessage(event:ChatEvent):void {
+				var msg:Message = model.getMessage();
+				
+				var from:String;
+				if (msg.from != null)from = "buddy";
+				else from = "me";
+				shapeMessage(msg,from);
+			}
+			
+			public function shapeMessage(m:Message,from:String="buddy",readed:Boolean=false,displayOnTop:Boolean=false,time:Date=null):void {
+					if (m == null)return;
+					var d:Date;
+					var dn:String;
+					if (time != null) d = time;
+					else if (m.time == null) d = new Date();
+					else d = m.time;
+					
+					if(from == "me")dn = "Me";
+					else dn = label;
+					
+					displayMessage(dn,d,m.body,from,readed,displayOnTop);
+					if (!readed && selected && from == "buddy"){
+						try {
+							if ( (this.parentApplication as Window).nativeWindow.active){
+								model.markUser(false);
+							}
+							
+						}catch (error:Error){
+							model.markUser(false);
+						}
+					}
+
+			}
+			private function getDate(date:Date):String {
+				var min:String = date.getMinutes().toString();
+				if (min.length ==1) min = "0"+min;
+				var h:String = date.getHours().toString();
+				if (h.length ==  1)h = "0"+h;
+				if (date.date < _today.date || date.month != _today.month){
+					return DateField.dateToString(date, "DD/MM/YYYY")+", "+h+ ":"+min;
+				}
+				return h+ ":"+min;
+			}
+			private function displayMessage(_from:String,_date:Date,_body:String,color:String,readed:Boolean=false,displayOnTop:Boolean=false):void {
+				try {
+					
+					moveScroll = !displayOnTop;
+					
+					if (displayOnTop){
+						if (_lastMsg.user != _from+displayOnTop.toString() || Math.abs(Math.floor((_lastMsg.date.time - _date.time)/60000)) > 1 ){
+							if (color == null || color.length == 0)color = "buddy";
+							_msgTFHist.addChildAt(0, msgTitleElement(_from,_colors[color].t,getDate(_date),true) );
+						}
+						_msgTFHist.addChildAt(1, msgBodyElement(_body) );
+					}else {
+						
+						model.description = _body.slice(0,80);
+						
+						if (_lastMsg.user != _from+displayOnTop.toString() || Math.abs(Math.floor((_lastMsg.date.time -_date.time)/60000)) > 1 ){
+							if (color == null || color.length == 0)color = "buddy";
+							_msgTF.addChild( msgTitleElement(_from,_colors[color].t,getDate(_date)) );
+						}
+						_lastEntry.addChild( msgBodyElement(_body) );
+					}
+
+					_lastMsg.user = _from+displayOnTop.toString();
+					_lastMsg.date = _date;
+					_lastMsg.readed = readed;
+				
+					callLater(scrollDown,[moveScroll] );
+				}catch (err:Error){
+					trace (err.getStackTrace());
+				}
+			}
+			private function scrollDown(ms:Boolean,immediately:Boolean=false,keepSpace:Number=0):void {
+				try {
+			 
+					if (!ms){
+						return;
+					}
+					
+					_rtG.validateNow();
+					if (immediately){
+						msgScroll.viewport.verticalScrollPosition = Math.max (msgScroll.verticalScrollBar.minimum+5,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+					}
+					else {
+						pth.valueTo = Math.max (msgScroll.verticalScrollBar.minimum+5,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+						anim.play();
+					}
+				}catch (error:Error){
+					(error.getStackTrace());
+				}
+			
+			}
+			
+			protected function init(event:FlexEvent,tryCounter:uint=0):void
+			{
+				try{
+					if ( model.bd.roster.jid.domain != (XMPPConnection.openConnections[0] as XMPPConnection).domain){
+						_inviteButton.includeInLayout = false;
+						_inviteButton.visible = false;
+					
+					}
+					onHeightChanged(null);
+					
+					if (model.sesionAllArchives.length>0){
+						addArchiveMessages(model.sesionAllArchives);
+					}
+					
+					this.addEventListener("stateChanged",onStateChange);
+					_stateTimer.addEventListener(TimerEvent.TIMER,stateTick);
+					
+					setTimeout(scrollDown,20,true,true,90);
+				
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+				
+
+			
+			}
+			
+			private function onScroll(e:PropertyChangeEvent):void {
+				if (scrollinginprogress )return;
+				if (e.source == e.target && e.property == "verticalScrollPosition"){
+					
+					if ((e.newValue < e.oldValue) && (model.archiveBeforeValue > 0) && (e.newValue  <= (msgScroll.verticalScrollBar.minimum+archiveScope.height) )){		
+					
+						if (!gettingArchiveInProgress){
+							
+							gettingArchiveInProgress = true;
+							model.getNewArchiveConversation();
+						}	
+					}
+				}
+			}
+			public function onRemoved():void
+			{
+				try {
+					model.removeEventListener(ChatEvent.NEW_MESSAGE, onNewIncomingMessage);
+					model.removeEventListener(ArchiveEvent.CONVERSATION_READY,onConversationReady);
+					this.removeEventListener("stateChanged",onStateChange);
+					_stateTimer.stop();
+					_stateTimer.removeEventListener(TimerEvent.TIMER,stateTick);
+				}catch (error:Error){
+					
+				}
+				this.removeAllElements();
+			}
+		
+			
+			public function set selected(b:Boolean):void {
+				_selected = b;
+				if (b){
+					model.hasUnreaded = true;
+				}
+				model.markUser(false)
+					
+			}
+			public function get selected():Boolean {
+				return _selected;
+			}
+			
+			protected function invite(event:MouseEvent):void
+			{
+				var e:ChatEvent = new ChatEvent(ChatEvent.USER_INVITE);
+				e.id = model.id;
+				owner.dispatchEvent( e );
+			}
+			
+			private function set state(s:String):void {
+				_state = s;
+				dispatchEvent(new Event("stateChanged"));
+			}
+			private function get state():String {
+				return _state
+			}
+			private function onStateChange(event:Event):void {
+				model.sendState(state);
+			}
+			private function stateTick(event:TimerEvent):void {
+				if (_stateTimer.currentCount%5==1){
+					_stillTyping = false;
+				}else if (_stateTimer.currentCount%5==2){
+					if (!_stillTyping){
+						state = Message.STATE_PAUSED;
+					}
+				}else if (_stateTimer.currentCount%5==0){
+					if (!_stillTyping){
+						state = Message.STATE_ACTIVE;
+						_stateTimer.stop();
+						_stateTimer.reset()
+					}
+				}
+			}
+			
+			
+			private function msgTitleElement(nickname:String, nickcolor:int, date:String, onTop:Boolean=false ):DivElement {
+			
+		
+				var msg:DivElement = new DivElement();
+				msg.paddingLeft = msg.paddingRight = 5;
+			
+				if (_lastEntry!=null){
+					createLineElement(onTop);
+				}else {
+					msg.paddingTop = -20;
+				}
+				var titleDiv:DivElement = new DivElement();
+				titleDiv.lineHeight  = SettingsManager.CHAT_FONT_SIZE + 7;
+				
+				var nickP:ParagraphElement = new ParagraphElement();
+				nickP.color = nickcolor;
+			//	nickP.fontWeight = "bold";
+				var nickSpan:SpanElement =  new SpanElement();
+				nickSpan.text = nickname;
+				nickP.addChild(nickSpan);
+			
+				var dateP:ParagraphElement = new ParagraphElement();
+				dateP.lineHeight = -SettingsManager.CHAT_FONT_SIZE+3;
+				dateP.color = 0xc1c1c1;
+				dateP.textAlign = "right";
+				dateP.fontSize = SettingsManager.CHAT_FONT_SIZE-1;
+				var dateSpan:SpanElement = new SpanElement();
+				dateSpan.text = "["+date+"]";
+				dateP.addChild(dateSpan);
+				
+				titleDiv.addChild(nickP);
+				titleDiv.addChild(dateP);
+				
+				
+				msg.addChild(titleDiv);
+				
+				_lastEntry = msg;
+				
+				return msg;
+
+				
+				
+			}
+			private function msgBodyElement(messageBody:String):ParagraphElement {
+			
+				var p:ParagraphElement = new ParagraphElement();
+				var hasIco:Boolean = false;
+				var nodes:Array = _emoticons.find(messageBody);
+				for (var i:uint = 0; i<nodes.length;i++){
+					p.addChild(nodes[i]);
+					if (nodes[i] is InlineGraphicElement){
+						hasIco = true
+					}
+				}
+				p.paddingLeft = 4;
+				if (hasIco){
+					p.lineHeight = 30;
+				}else {
+					p.lineHeight = SettingsManager.CHAT_FONT_SIZE+6;
+				}
+				return p;
+			}
+			private function createLineElement(onTop:Boolean):void {
+
+				if (!onTop && !_msgTF.getChildAt(1)){
+			//		return;
+				}
+				var line:InlineGraphicElement = new InlineGraphicElement();
+				line.source = dot;
+				//line.width = msgDisplay.width;
+				BindingUtils.bindProperty(line,"width",msgDisplay,"width")
+				line.height = .5;
+				var pn:ParagraphElement = new ParagraphElement();
+				
+				pn.addChild(line);
+				
+			
+				if (onTop) _msgTFHist.addChildAt(0, pn);
+				else _msgTF.addChild(pn);
+				
+			}
+			public function get moveScroll():Boolean {
+				return _moveScroll;
+			}
+			public function set moveScroll(b:Boolean):void {
+				_moveScroll = b;
+			}
+			
+			public function searchForEmotions(s:String):void {
+				_emoticons.find(s);
+			}
+			public function setInputString(s:String):void {
+				_outgoingMsgField.appendText( s );
+				_outgoingMsgField.setFocus();
+			}
+			
+		
+			[Bindable]
+			public function get hasHistory():Boolean {
+				return _hasHistory;
+			}
+			public function set hasHistory(b:Boolean):void {
+				_hasHistory = b;
+			}
+			private function onHeightChanged(event:Event):void {
+				hasHistory = model.archiveCount > 0;
+				try {
+					archiveScope.height = model.archiveBeforeValueHeight;
+					msgHistory.top = archiveScope.height;
+					msgDisplay.top =  msgHistory.height + archiveScope.height;
+				}catch (error:Error){
+					callLater( onHeightChanged, [event] )
+				}
+
+			}
+			
+			
+		
+			protected function initScroll(event:FlexEvent):void
+			{
+				msgScroll.viewport.addEventListener(PropertyChangeEvent.PROPERTY_CHANGE, onScroll);
+
+			}
+			
+		 
+			
+		]]>
+	</fx:Script>
+
+	
+	
+	<mx:VDividedBox width="100%" height="100%" top="0" verticalGap="3" dividerColor="#77db40" dividerAffordance="100"  backgroundAlpha="1" backgroundColor="#FFFFFF">
+		<s:SkinnableContainer id="_incommingMsg" width="100%"  height="100%" minHeight="200" left="0" right="0">
+			<s:Group width="100%" height="58" left="0" right="0">
+				<s:Rect id="backgroundRect" left="1" top="0" right="0" bottom="1" >
+					<s:stroke>
+						<s:LinearGradientStroke rotation="90" weight="1">
+							<s:GradientEntry color="#000000" alpha=".5" />
+							<s:GradientEntry color="#000000" alpha=".45"  />
+						</s:LinearGradientStroke>
+					</s:stroke>
+					<s:fill>
+						<s:LinearGradient rotation="90">
+							<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+							<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".89"/>	
+							<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+						</s:LinearGradient>
+						
+					</s:fill>
+				</s:Rect>
+				
+				<s:BitmapImage width="41" height="40" source="{model.bd.avatar.foto}" smooth="true" scaleMode="zoom" verticalAlign="top" horizontalAlign="left" id="_avatar" left="6" top="6" />
+				<utils:ShowLed top="6" left="49" showLed="{(model.bd as IMBuddyModel).rosterShow}" 	/>
+				<s:HGroup left="66" right="12" top="8" width="96%">
+					<s:Label text="{model.bd.nickname}" id="_labelW" maxWidth="{_incommingMsg.width - 120}" maxDisplayedLines="1" styleName="_contactItemDN" color="#FFFFFF" />
+					<s:Label color="#ffd78a" styleName="_contactItemDN" text="{email}" maxWidth="{_incommingMsg.width - _labelW.width - 90}"  maxDisplayedLines="1" />
+				</s:HGroup>
+				<s:Label text="{(model.bd as IMBuddyModel).status}"
+							left="51" right="22"
+							top="24"
+							bottom="3"
+							maxDisplayedLines="2"
+						
+							color="#a8d2f6" styleName="_contactItemStatus"
+							>
+					<fx:Script>
+						<![CDATA[
+							import spark.components.supportClasses.TextBase;
+							TextBase.mx_internal::truncationIndicatorResource = "...";
+						]]>
+					</fx:Script>
+					</s:Label>
+				
+				<s:Button toolTip="Invite to Chat"
+						  right="6" bottom="7"
+						  visible="{model.id.indexOf('5c40')==-1}"
+						  buttonMode="true" id="_inviteButton"
+						  styleName="chatWindowButtonSkin"
+						  click="invite(event)"/>
+			</s:Group>
+			
+			<s:Scroller horizontalScrollPolicy="off" id="msgScroll" width="100%"  top="58" bottom="0" creationComplete="initScroll(event)"    >
+				<s:viewport>
+					<s:Group clipAndEnableScrolling="true" width="100%" id="_rtG" >
+						<s:SkinnableContainer width="100%" minHeight="0" includeInLayout="{hasHistory}"
+											  left="0" right="0"
+											  height="{model.archiveBeforeValueHeight}"
+											  id="archiveScope"
+											  backgroundColor="#00FF00"
+											  backgroundAlpha="0.7" />
+					
+						<s:RichEditableText id="msgHistory"  includeInLayout="{hasHistory}"
+											editable="false" minHeight="0" 
+											paddingBottom="8" paddingTop="5"
+											top="{model.archiveBeforeValueHeight}" 	left="0" right="0"
+											fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+											textFlow="{_msgTFHist}"
+											/> 
+						<s:RichEditableText id="msgDisplay" 
+									editable="false" minHeight="{msgScroll.height-2}"
+									left="0" right="0" top="{msgHistory.height + archiveScope.height}"
+									paddingBottom="8" paddingTop="4" 
+									fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+									textFlow="{_msgTF}"
+									/>
+					</s:Group>
+				</s:viewport>
+			
+			</s:Scroller>
+	
+			
+		</s:SkinnableContainer>
+		
+		<s:SkinnableContainer id="_outgoingMsg" height="54" width="100%" minHeight="40" styleName="_newOutgoingMessageBox" backgroundColor="#FFFFFF"   >
+			<s:TextArea id="_outgoingMsgField" left="4" right="0" top="0" bottom="0" fontSize="{SettingsManager.CHAT_FONT_SIZE}"
+						color="#434343" 
+						paragraphSpaceAfter="0"
+						borderVisible="true"
+						borderAlpha=".0"
+						contentBackgroundAlpha="0"
+						keyDown="onKeyDown(event)" textInput="onInput(event)" 
+						creationComplete="onCreationComplete(event)"
+						paragraphSpaceBefore="0" whiteSpaceCollapse="collapse" breakOpportunity="auto" />
+		</s:SkinnableContainer>
+		
+	</mx:VDividedBox>
+</s:NavigatorContent>

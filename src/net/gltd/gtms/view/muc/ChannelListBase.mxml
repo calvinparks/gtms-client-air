@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" 
+					xmlns:parsley="http://www.spicefactory.org/parsley"
+					xmlns:muc="net.gltd.gtms.view.muc.*" 
+					xmlns:view="net.gltd.gtms.view.*"
+					width="100%" height="100%" styleName="rosterContainer"
+					addedToStage="addetToStage(event)"
+					creationComplete="init(event)" 
+					>
+	<fx:Metadata>
+		[Event(name="onOpenNewWindow",type="net.gltd.gtms.events.muc.MUC_UI_Event")]
+		[Event(name="onShowInfo",type="net.gltd.gtms.events.muc.MUC_UI_Event")]
+		[Event(name="onEditChannel",type="net.gltd.gtms.events.muc.MUC_UI_Event")]
+		[Event(name="onEditStream",type="net.gltd.gtms.events.muc.MUC_UI_Event")]
+		[Event(name="onUserOpenStream",type="net.gltd.gtms.events.UserEvent")]
+		[ManagedEvents("onOpenNewWindow, onShowInfo, onEditChannel, onEditStream, onUserOpenStream")]
+	</fx:Metadata>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.GUI.contextMenu.ContextMenuItem;
+			import net.gltd.gtms.controller.muc.MUCInterfaceManager;
+			import net.gltd.gtms.controller.muc.MUCXMPPManager;
+			import net.gltd.gtms.events.UserEvent;
+			import net.gltd.gtms.events.muc.ChannelItemEvent;
+			import net.gltd.gtms.events.muc.MUC_UI_Event;
+			import net.gltd.gtms.events.muc.UIEvent;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.model.muc.StreamModel;
+			import net.gltd.gtms.utils.FilterArrayCollection;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.core.FlexGlobals;
+			import mx.events.CollectionEvent;
+			import mx.events.CollectionEventKind;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.bookmark.GroupChatBookmark;
+			import org.igniterealtime.xiff.conference.Room;
+			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
+			
+			[Bindable][Inject]
+			public var mucManger:MUCInterfaceManager;
+			
+			[Bindable]
+			public var dataProvider:FilterArrayCollection;
+			
+			[Bindable]
+			public var myKind:String = "kindChannel";
+			
+			[Bindable][Embed(source="../assets/ico/join.png")]
+			public	var join_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/info.png")]
+			public	var info_ico:Class;
+		
+			[Bindable][Embed(source="../assets/ico/follow.png")]
+			public	var follow_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/settings.png")]
+			public	var settings_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/fav.png")]
+			public	var fav_ico:Class;
+		
+			[Bindable][Embed(source="../assets/ico/autojoin_on.png")]
+			public	var autojoin_on_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/autojoin_off.png")]
+			public	var autojoin_off_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/leave.png")]
+			public	var leave_ico:Class;
+			
+			[Bindable][Embed(source="../assets/ico/x.png")]
+			public	var delete_ico:Class;
+			
+			
+			protected var sort:Sort;
+			
+			
+			public	static	var CHANNEL_CONTEXT_MENU:Function;
+			private			var _filter_value:String;
+			
+			protected function init(event:FlexEvent):void
+			{
+				CHANNEL_CONTEXT_MENU = onShowContextMenu;
+				dataProvider = new FilterArrayCollection();
+				setTimeout(
+					function():void {
+						try {
+							if (mucManger.items != null){
+								for (var i:uint = 0; i<mucManger.items.length;i++){
+									try {
+										if ( mucManger.items.getItemAt(i).kind != myKind) continue;
+										dataProvider.addItem(mucManger.items.getItemAt(i));
+									}catch (er:Error){
+										continue;										
+									}
+								}
+							}
+							mucManger.items.addEventListener(CollectionEvent.COLLECTION_CHANGE,onSourceChanged,false,0,true);
+							if (myKind == ChannelModel.KIND_CHANNEL) dataProvider.filterFunction = filterfunctionChannel;
+							else if (myKind == StreamModel.KIND_STREAM) dataProvider.filterFunction = filterfunctionStream;
+							
+						
+							sort = new Sort();
+							var sortField:SortField = new SortField("label");
+							sort.fields = [sortField];
+							
+							dataProvider.sort = sort;
+							dataProvider.refresh();
+							
+						}catch (error:Error){
+						}
+				
+					},5000
+				);
+			}
+			private function onSourceChanged(event:CollectionEvent):void {
+				if (event.kind == CollectionEventKind.REFRESH) {
+					return;
+				}
+				if ( event.items[0].kind != myKind) return;
+				if (event.kind == CollectionEventKind.ADD) dataProvider.addItem( event.items[0] );
+				else if (event.kind == CollectionEventKind.REMOVE)dataProvider.removeByID( event.items[0].id );
+			}
+			private function onFollowChange(event:ChannelItemEvent):void {
+				onFollow(event.type,event.item)
+			}
+			private function onFollow(type:String,item:ChannelModel):void {
+				if (type == ChannelItemEvent.EVENT_FOLLOW) {
+					mucManger.iqsManager.bookmarkManager.addGroupChatBookmark( new GroupChatBookmark(  item.jid, item.name) );
+				}else if (type == ChannelItemEvent.EVENT_UNFOLLOW) {
+					mucManger.iqsManager.bookmarkManager.removeGroupChatBookmark(item.jid.unescaped);
+				}
+			}
+			private function onFavChange(event:ChannelItemEvent):void {
+				if (event.item is StreamModel){
+					if ( !(event.item as StreamModel).subscribed )	mucManger.iqsManager.pubsub( event.item.interest, null, null, false);
+					else mucManger.iqsManager.pubsub( event.item.interest, event.item.subscription.subid, event.item.subscription.jid, true);
+				//	mucManger.iqsManager.pubsub( (event.item as StreamModel).interest, (event.item as StreamModel).subscribed);
+				}
+			}
+			protected function addetToStage(event:Event):void
+			{
+				FlexGlobals.topLevelApplication['_parslaey'].context.viewManager.addViewRoot( this );
+			}
+			
+			protected function initList(event:FlexEvent):void
+			{
+				_dg.addEventListener(ChannelItemEvent.EVENT_FOLLOW,onFollowChange);
+				_dg.addEventListener(ChannelItemEvent.EVENT_UNFOLLOW,onFollowChange);
+				_dg.addEventListener(ChannelItemEvent.EVENT_SHOWCONTEXT,onShowContextMenu);
+				_dg.addEventListener(ChannelItemEvent.EVENT_FAV,onFavChange);
+			}
+			private function onShowContextMenu (event:ChannelItemEvent):void {
+				
+				var menuItems:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = new Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem>();	
+				if (event.item is StreamModel){
+					
+					if( (event.item as StreamModel).subscribed ){
+						menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Unsubscribe",follow_ico,true,false,doSubscribe,[event.item,false]) );
+					}else {
+						menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Subscribe",follow_ico,true,false,doSubscribe,[event.item,true]) );
+					}
+					
+					
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Open Stream",net.gltd.gtms.GUI.contextMenu.ContextMenuItem.CHAT_ICO,true,false,openStream,[event.item]) );
+				//	menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("View Info",info_ico,true,false,null) );
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Edit stream",settings_ico,true,false,editStream,[event.item]) );
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Delete stream",delete_ico,true,false,removeStream,[event.item]) );
+					net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu(event.mouseEvent,menuItems);
+					
+					return;
+				}
+
+			
+				if (event.item.room!=null && event.item.room.active){
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Leave",leave_ico,true,false,event.item.room.leave ) );
+				}else {
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Join",join_ico,true,false,mucManger.iqsManager.joinRoom,[event.item.jid.unescaped] ) );
+				}
+				
+				if (event.item.followed)menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Unsubscribe",follow_ico,true,false,onFollow,[ChannelItemEvent.EVENT_UNFOLLOW,event.item]) );
+				else menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Subscribe",follow_ico,true,false,onFollow,[ChannelItemEvent.EVENT_FOLLOW,event.item]) );
+				
+				var aj:Class;
+				if (event.item.autoJoin==true) aj = aj = autojoin_off_ico;
+				else aj = autojoin_on_ico;
+				menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Auto Join",aj,event.item.followed,false,autoJoin,[event.item]) );
+				menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Add To Favorites",fav_ico,false) );
+			
+				var settingsEnabled:Boolean = false;
+				if (event.item.room!=null && (event.item.room.affiliation == Room.AFFILIATION_OWNER || event.item.room.affiliation == Room.AFFILIATION_ADMIN))settingsEnabled = true;
+				menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Channel Settings",settings_ico,settingsEnabled,false,showEdit,[event.item]) );
+				menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("View Info",info_ico,true,false,showInfo,[event.item]) );
+				
+				
+				if (event.item.room!=null && event.item.room.active && event.item.room.role == Room.ROLE_MODERATOR){
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Change Subject",null,true,true,MUCXMPPManager.onChangeSubject,[event.item.room]) );
+				}
+				net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu(event.mouseEvent,menuItems);
+			}
+			
+			private function removeStream(item:StreamModel):void {
+				if (item.subscribed)doSubscribe(item,false);
+				mucManger.iqsManager.streamsManager.deleteStream(item.id);
+			}
+			
+			private function doSubscribe(item:StreamModel, doSub:Boolean):void {
+				if (doSub)	mucManger.iqsManager.pubsub( item.interest, null, null, false);
+				else mucManger.iqsManager.pubsub( item.interest, item.subscription.subid, item.subscription.jid, true);
+			}
+			
+			private function openStream(item:StreamModel):void {
+				var eu:UserEvent = new UserEvent(UserEvent.USER_OPEN_STREAM);
+				eu.data = item;
+				dispatchEvent(eu);
+			}
+			private function editStream(item:StreamModel):void {
+				var ev:MUC_UI_Event = new MUC_UI_Event(MUC_UI_Event.EDIT_STREAM);
+				ev.item = item;
+				dispatchEvent( ev );
+			}
+			private function showEdit(item:ChannelModel):void {
+				var ev:MUC_UI_Event = new MUC_UI_Event(MUC_UI_Event.EDIT_CHANNEL);
+				ev.item = item;
+				dispatchEvent( ev );
+			}
+			private function showInfo(item:ChannelModel):void {
+				var ev:MUC_UI_Event = new MUC_UI_Event(MUC_UI_Event.SHOW_INFO);
+				ev.item = item;
+				dispatchEvent( ev );
+			}
+			private function autoJoin(item:ChannelModel):void {
+				item.autoJoin = !item.autoJoin;
+			//	item.bookmark.autoJoin = item.autoJoin;
+			//	mucManger.iqsManager.bookmarkManager.addGroupChatBookmark( 	item.bookmark );
+				mucManger.iqsManager.bookmarkManager.setAutoJoin(item.jid.unescaped, item.autoJoin);
+			}
+			protected function listCC(event:FlexEvent):void
+			{
+				_filters1.addEventListener(UIEvent.EVENT_FILTER_CHANGED,onFilterChanged);
+			}
+			protected function listCC2(event:FlexEvent):void
+			{
+				_filters2.addEventListener(UIEvent.EVENT_FILTER_CHANGED,onFilterChanged);
+			}
+			private function onFilterChanged(event:UIEvent):void {
+				_filter_value = event.filterValue;
+				dataProvider.refresh();
+				_dg.validateNow();
+			}
+			private function filterfunctionChannel(obj:ChannelModel):Boolean {
+				if (_filter_value == FilterDropDown.FILTER_FOLLOWED) return obj.followed && (obj.name+obj.jid.toString()).toLowerCase().indexOf(_search) > -1;
+				if (_filter_value == FilterDropDown.FILTER_MY) return obj.isMy && (obj.name+obj.jid.toString()).toLowerCase().indexOf(_search) > -1;
+				return (obj.name+obj.jid.toString()).toLowerCase().indexOf(_search) > -1;
+			}
+			private function filterfunctionStream(obj:StreamModel):Boolean {
+				if (_filter_value == FilterDropDownStream.FILTER_SUBSCRIBED) return obj.subscribed && (obj.name+obj.id+obj.description+obj.keywords+obj.participants+obj.channels).toLowerCase().indexOf(_search) > -1;
+				if (_filter_value == FilterDropDownStream.FILTER_UNSUBSCRIBED) return obj.subscribed==false && (obj.name+obj.id+obj.description+obj.keywords+obj.participants+obj.channels).toLowerCase().indexOf(_search) > -1;
+				
+				return (obj.name+obj.id+obj.description+obj.keywords+obj.participants+obj.channels).toLowerCase().indexOf(_search) > -1
+			}
+			
+			protected function createNew(event:MouseEvent):void
+			{
+				var ev:MUC_UI_Event = new MUC_UI_Event(MUC_UI_Event.OPEN_NEW_WINDOW);
+				ev.itemKind = myKind;
+				dispatchEvent( ev );
+			}
+			
+			private var _search:String = "";
+			public function search(str:String):void {
+				_search = str.toLowerCase();
+				dataProvider.refresh();
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	 
+	
+	
+	
+	<view:InterfaceListHeader id="_utils">
+		<muc:FilterDropDown id="_filters1" left="3" verticalCenter="-1" creationComplete="listCC(event)" includeInLayout="{myKind==ChannelModel.KIND_CHANNEL}" visible="{myKind==ChannelModel.KIND_CHANNEL}" />
+		<muc:FilterDropDownStream id="_filters2" left="3" verticalCenter="-1" creationComplete="listCC2(event)" includeInLayout="{myKind==StreamModel.KIND_STREAM}" visible="{myKind==StreamModel.KIND_STREAM}" />
+		<s:Button skinClass="net.gltd.gtms.view.muc.MucButtonSkin" icon="@Embed('../assets/add_ico.png')" label="New" right="6" verticalCenter="0" click="createNew(event)"/>
+	</view:InterfaceListHeader>
+	<s:Scroller id="contactsScroll" left="0" right="0" bottom="0" top="{_utils.height+2}">
+		<s:viewport>
+			<s:Group width="100%" clipAndEnableScrolling="true">
+				<s:List	id="_dg"
+						itemRenderer="net.gltd.gtms.view.muc.ChannelItemRenderer"
+						bottom="0" top="0"
+						name = "{myKind}" width="100%"
+						styleName="_contactsList"
+						borderVisible="false"  
+						dataProvider="{dataProvider}"
+						requireSelection = "false" 
+						arrowKeysWrapFocus="true"
+						contentBackgroundAlpha="0"
+						skinClass="net.gltd.gtms.view.NoScrollListSkin"
+						creationComplete="initList(event)" doubleClickEnabled="true">
+				</s:List>
+						
+			</s:Group>
+		</s:viewport>
+	</s:Scroller>	
+		
+		
+</s:NavigatorContent>

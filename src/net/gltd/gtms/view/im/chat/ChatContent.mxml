@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent
+					implements="mx.core.INavigatorContent"
+					xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+					xmlns:chat="net.gltd.gtms.view.chat.*"
+					xmlns:IM="net.gltd.gtms.view.IM.*"
+					xmlns:chat1="net.gltd.gtms.model.chat.*"
+					xmlns:parsley="http://www.spicefactory.org/parsley"
+					xmlns:chat2="net.gltd.gtms.view.im.chat.*" removedFromStage="onRemove(event)" >
+	
+	<fx:Script>
+		
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.GUI.contextMenu.ContextMenuItem;
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ChatEvent;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.im.MessageModel;
+			
+			import flash.utils.setTimeout;
+			
+			import flashx.textLayout.elements.DivElement;
+			import flashx.textLayout.elements.LinkElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.core.XMPPConnection;
+			import org.igniterealtime.xiff.data.Message;
+			import org.igniterealtime.xiff.data.im.RosterItemVO;
+			import org.igniterealtime.xiff.events.PropertyChangeEvent;
+			import spark.components.Window;
+
+			public var who:String;
+			
+			[Bindable]
+			private			var			_tf						:TextFlow = new TextFlow();
+			private			var			_composing				:Message,
+										_lastMsg				:Object		= {user:"",date:"",readed:false},
+										_lastEntry				:DivElement,
+										_colors					:Object = {
+																	me: {t:0x14478e,b:SettingsManager.CHAT_COLOR},
+																	buddy: {t:0xd84f0c,b:SettingsManager.CHAT_COLOR}
+																},
+										_roster					:RosterItemVO,
+										_today					:Date = new Date(),
+										
+										_data					:MessageModel,
+										
+										_state					:String = Message.STATE_ACTIVE,
+										_stateTimer				:Timer = new Timer (400),
+										_stillTyping			:Boolean = false;
+										
+								
+										
+										
+			[Bindable]
+			public			var			bd						:IMBuddyModel;
+			
+
+			
+			public			var			_id						:String,
+										glow					:Boolean = false;
+			
+			[Bindable]
+			public			var			tabColor				:uint = 0x6d9cc2;
+		
+			
+			
+			private			var			_tabCurrentState		:String = "normal";
+				
+			
+			[Bindable]
+			public function get data():MessageModel{
+				return _data;
+			}
+			public function set data(val:MessageModel):void {
+				_data = val
+			
+				
+				
+				bd = buddiesHolder.getInstance().getBuddy(_data.id) as IMBuddyModel;
+				try {
+					if (bd == null){
+						_roster = RosterItemVO.get(new UnescapedJID(val.id));
+						label = _roster.nickname;
+					}else {
+						_roster = bd.roster;
+						label = bd.nickname;
+					}
+				}catch (error:Error){
+					label = val.id;
+				}
+				_id = val.id;
+				
+				setTimeout(initMessages,200)
+			}
+			private function initMessages():void {
+				var i:uint;
+				var from:String;
+				var m:Message;
+				var del:int = 200;
+				var l:uint = _data.readed.length;
+				for (i = 0; i<l;i++){
+					m = data.readed[i];
+					if (m.from != null)from = "buddy";
+					else from = "me";
+					shapeMessage(m,from,true);
+					del+=50
+				}
+				if (data.messages.length > 0) {
+					if (tabCurrentState == "normal")tabColor = 0x00BE00;
+				}
+				l = data.messages.length;
+				for (i = 0; i<l;i++){
+					shapeMessage(data.getMessage(),"buddy",false);
+					del+=50;
+				}
+				data.addEventListener(ChatEvent.NEW_MESSAGE,onMessage);
+				setTimeout(checkActive,500)
+			}
+			private function checkActive (b:Boolean=false):void {
+				if (!b) {
+					setTimeout(checkActive,800,true);
+					return
+				}
+				try {
+					if ( (this.parentApplication as Window).nativeWindow.active && tabCurrentState == "selected") {
+						data.markUser(false)
+					}
+				}catch (error:Error){
+					
+				}
+			}
+			private function init(ik:uint=0):void {
+				try {
+					_tf.paddingTop = 0;
+					_tf.paddingLeft = 6;
+					_tf.paddingRight = 6;
+				
+					_state = Message.STATE_ACTIVE;
+					_stateTimer.addEventListener(TimerEvent.TIMER,stateTick);
+					
+					_rosterInfo.status = bd.roster.status;
+					_rosterInfo.show.showLed = ShowStatusManager.getShowIco(bd.roster);
+					if ( bd.roster.jid.domain != (XMPPConnection.openConnections[0] as XMPPConnection).domain){
+						_rosterInfo._inviteButton.includeInLayout = false;
+						_rosterInfo._inviteButton.visible = false;
+					}else {
+						_rosterInfo._inviteButton.addEventListener(MouseEvent.CLICK,onInviteClick);
+					}
+					bd.roster.addEventListener(PropertyChangeEvent.CHANGE,onPropertyChange);
+					this.addEventListener("stateChanged",onStateChange);
+				
+					_rosterInfo.mail = bd.vCard.email;
+					if (bd.vCard.workTelephone!=null && bd.vCard.workTelephone.cell!=null && bd.vCard.workTelephone.cell.length>0){
+						_rosterInfo.cellP = bd.vCard.workTelephone.cell;
+					}else if (bd.vCard.homeTelephone !=null && bd.vCard.homeTelephone.cell!=null && bd.vCard.homeTelephone.cell.length>0){
+						_rosterInfo.cellP = bd.vCard.homeTelephone.cell;
+					}
+					
+					if (bd.vCard.workTelephone!=null && bd.vCard.workTelephone.voice!=null && bd.vCard.workTelephone.voice.length>0){
+						_rosterInfo.workP = bd.vCard.workTelephone.voice;
+					}
+					_rosterInfo.addEventListener(MouseEvent.RIGHT_CLICK,onRightClick);
+					
+					_rosterInfo.avatar.ico.source = bd.avatar.bmpData;
+				}catch (error:Error){
+					if (ik<3)setTimeout(init,800,++ik)
+				}
+			}		
+			private function set state(s:String):void {
+				_state = s;
+				dispatchEvent(new Event("stateChanged"));
+			}
+			private function get state():String {
+				return _state
+			}
+			private function onStateChange(event:Event):void {
+				data.sendState(state);
+			}
+			private function stateTick(event:TimerEvent):void {
+				if (_stateTimer.currentCount%5==1){
+					_stillTyping = false;
+				}else if (_stateTimer.currentCount%5==2){
+					if (!_stillTyping){
+						state = Message.STATE_PAUSED;
+					}
+				}else if (_stateTimer.currentCount%5==0){
+					if (!_stillTyping){
+						state = Message.STATE_ACTIVE;
+						_stateTimer.stop();
+						_stateTimer.reset()
+					}
+				}
+			}
+			private function onPropertyChange(event:PropertyChangeEvent):void {
+				try {
+					if (event.name=="nickname"){
+						data.label =  bd.roster.nickname;
+						label =  bd.roster.nickname;
+						_rosterInfo.nickname = bd.roster.nickname;
+						return
+					}
+					if (event.name == "show" || event.name == "status" || event.name == "online"){
+						_rosterInfo.status = bd.roster.status;
+						_rosterInfo.show.showLed = ShowStatusManager.getShowIco(bd.roster);
+					}
+				}catch (error:Error){
+					
+				}
+			}
+			private function onMessage(event:ChatEvent):void {
+				var m:Message = _data.getMessage();
+				shapeMessage(m);
+				if (tabCurrentState == "normal")tabColor = 0x00BE00; 
+				checkActive()
+				
+			}
+			public function shapeMessage(m:Message,from:String="buddy",readed:Boolean=false):void {
+				if (m == null)return;
+				var d:Date;
+				var dn:String;
+				
+				if (m.time == null)d = new Date();
+				else d = m.time;
+				
+				if(from == "me")dn = "Me";
+				else dn = label;
+				displayMessage(dn,getDate(d),m.body,from,readed);
+			}
+			protected function onKeyDown(event:KeyboardEvent):void
+			{
+				if (event.keyCode == 13 && event.shiftKey == false){
+					var msg:String = _outgoingMsgField.text;
+					if (msg.lastIndexOf("\n") == msg.length -1){
+						msg = msg.slice(0,msg.lastIndexOf("\n"))
+					}
+					_data.sendMessage(msg);
+					displayMessage("Me",getDate(new Date()),msg,"me",false);
+					_outgoingMsgField.text = "";
+				}else {
+					if ( _outgoingMsgField.text.length < 1) {
+						_stillTyping = false;
+						state = Message.STATE_ACTIVE;
+					}
+					_stillTyping = true;
+					if (state != Message.STATE_COMPOSING){
+						state = Message.STATE_COMPOSING;
+						if (!_stateTimer.running)_stateTimer.start();
+					}else {
+					
+					}
+				}
+			}
+			protected function onInviteClick(event:MouseEvent):void {
+				dispatchEvent( new ChatEvent(ChatEvent.USER_INVITE));
+			}
+			
+			
+			private function getDate(date:Date):String {
+				var min:String = date.getMinutes().toString();
+				if (min.length ==1) min = "0"+min;
+				var h:String = date.getHours().toString();
+				if (h.length ==  1)h = "0"+h;
+				if (date.date < _today.date || date.month != _today.month){
+					return date.date+"."+(date.month+1)+"."+date.fullYear+", "+h+ ":"+min;
+				}
+				return h+ ":"+min;
+			}
+			private function displayMessage(_from:String,_date:String,_body:String,color:String,readed:Boolean=false):void {
+				try {
+					var newEntry:DivElement
+					var p:ParagraphElement
+					var body:SpanElement
+					var author:SpanElement
+					
+					body = new SpanElement();
+					var bodys:Array
+					
+					if (_body.toLowerCase().indexOf("http://") > -1 || _body.toLowerCase().indexOf("https://") > -1){
+						var protocol:String;
+						if (_body.toLowerCase().indexOf("https://") > -1)protocol = "https://";
+						else protocol = "http://";
+						
+						var _bodyArray:Array = _body.split(protocol);
+						var sliceTo:int = (_bodyArray[1] as String).indexOf(" ");
+						if (sliceTo == -1) sliceTo = (_bodyArray[1] as String).length;
+						var href:String = protocol+(_bodyArray[1] as String).slice(0,sliceTo)
+						_bodyArray[1] =_bodyArray[1].toString().slice( (_bodyArray[1] as String).indexOf(" "),(_bodyArray[1] as String).length-1)
+						_body = _bodyArray[0] + "<s:a href='"+href+"'>"+href+"</s:a>"+_bodyArray[1]
+						
+						bodys = [ _bodyArray[0], href,_bodyArray[1] ]
+					}
+					body.text = _body;
+					
+					
+					if (_lastMsg.user == _from && _lastMsg.date == _date && _lastMsg.readed == readed){
+						p = new ParagraphElement();
+						_lastEntry.addChild(p);		
+						p.paddingLeft = 7;
+						if (bodys != null && bodys.length > 0){
+							for (var iB:uint = 0; iB < bodys.length; iB++){
+								if (bodys[iB].indexOf ("http")==0){
+									var a:LinkElement = new LinkElement();
+									var aN:SpanElement = new SpanElement()
+									aN.text = bodys[iB]
+									a.addChild(aN)
+									a.href = bodys[iB];
+									a.setStyle("color","#0000FF");
+									aN.setStyle ("textDecoration","none");
+									a.textDecoration = "none";
+									p.addChild(a);
+								}else {
+									var bd1:SpanElement = new SpanElement();
+									bd1.text = bodys[iB];
+									p.addChild(bd1);
+								}
+							}
+						}else {
+							p.addChild(body);
+						}
+						if (msgDisplay)	msgDisplay.appendText("");
+						return;
+					}
+					
+					author = new SpanElement();
+					
+					if (color == null || color.length == 0){
+						color = "buddy";
+					}
+					
+					
+					author.color = _colors[color].t;
+					
+					author.fontWeight = "bold";
+					author.text =  _from +" ["+_date+"]  "; 
+					
+					newEntry = new DivElement();
+					p = new ParagraphElement();
+					if (_lastEntry == null){
+						p.paragraphSpaceBefore = 0;
+					}else {
+						p.paragraphSpaceBefore = 7;
+						p.paragraphSpaceAfter = 4;
+					}
+					newEntry.addChild(p);		
+					
+					_lastEntry = newEntry;
+					
+					p.addChild(author);
+					if (bodys != null && bodys.length > 0){
+						for (var iB2:uint = 0; iB2 < bodys.length; iB2++){
+							
+							if (bodys[iB2].indexOf ("http")==0){
+								var a2:LinkElement = new LinkElement();
+								var aN2:SpanElement = new SpanElement()
+								aN2.text = bodys[iB2]
+								a2.addChild(aN2)
+								a2.href = bodys[iB2];
+								a2.setStyle("color","#0000FF");
+								aN2.setStyle ("textDecoration","none")
+								a2.textDecoration = "none"
+								p.addChild(a2);
+							}else {
+								var bd2:SpanElement = new SpanElement();
+								bd2.text = bodys[iB2];
+								p.addChild(bd2);
+							}
+						}
+					}else {
+						p.addChild(body);
+					}
+					if (readed) {
+						newEntry.setStyle("textAlpha",.65);
+					}
+					_tf.addChild(newEntry);
+					
+					if (msgDisplay)	msgDisplay.appendText("");
+					
+					_lastMsg.user = _from;
+					_lastMsg.date = _date;
+					_lastMsg.readed = readed
+				}catch (err:Error){
+					
+					
+				}
+				
+				
+			}			
+			protected function onRemove(event:Event):void
+			{
+				try {
+					if (_stateTimer.running)_stateTimer.stop()
+					state = Message.STATE_ACTIVE;
+					_data.removeEventListener(ChatEvent.NEW_MESSAGE,onMessage);
+					bd.roster.removeEventListener(PropertyChangeEvent.CHANGE,onPropertyChange);
+				}catch (error:Error){
+					
+				}
+			}
+			
+			private function onRightClick(event:MouseEvent):void {
+				var items:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = bd.renderMenuItemsFunction(bd);
+				var newItems:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem> = new Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem>();
+				for (var i:uint = 0; i< items.length; i++){
+					if (items[i].label != "Chat"){
+						newItems.push( items[i] )
+					}
+				}
+				net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu( event, newItems );
+			}
+			
+			protected function onCreationComplete(event:FlexEvent):void
+			{
+				(_outgoingMsgField.parentApplication)['activate']();
+				_outgoingMsgField.setFocus();
+			}
+			
+			public function set tabCurrentState(s:String):void {
+				_tabCurrentState = s;
+				checkActive()
+			}
+			[Bindable]
+			public function get tabCurrentState():String{
+				return _tabCurrentState;
+			}
+		]]>
+	
+	</fx:Script>
+	
+	<chat2:ChatRosterInfo id="_rosterInfo" creationComplete="init()" nickname="{label}" />
+	<s:VGroup top="67" bottom="0" left="0" right="0" gap="3" width="100%" height="100%">
+	
+		<s:SkinnableContainer id="_incommingMsg" styleName="_incomingMessageBox"  width="100%"  height="100%">
+			<s:TextArea id="msgDisplay"
+				left="0" right="0" top="3" bottom="3"
+				borderVisible="false" textFlow="{_tf}"
+				fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+						contentBackgroundAlpha="0.0"  editable="false">
+		
+			</s:TextArea>
+		
+		</s:SkinnableContainer>
+		<s:SkinnableContainer id="_outgoingMsg" width="100%" height="62" styleName="_outgoingMessageBox">
+			<s:TextArea id="_outgoingMsgField" left="0" right="0" top="0" bottom="0" fontSize="{SettingsManager.CHAT_FONT_SIZE}"
+						color="#434343" contentBackgroundAlpha="0.0" 
+						paragraphSpaceAfter="0" keyDown="onKeyDown(event)" creationComplete="onCreationComplete(event)"
+						paragraphSpaceBefore="0" whiteSpaceCollapse="preserve"/>
+		</s:SkinnableContainer>
+		
+	</s:VGroup>
+</s:NavigatorContent>

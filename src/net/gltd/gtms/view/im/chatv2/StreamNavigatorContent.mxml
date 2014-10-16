@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+					backgroundAlpha="1" backgroundColor="#FFFFFF"
+					>
+	<fx:Declarations>
+		<s:Animate id="anim" target="{msgScroll.viewport}" duration="200" startDelay="0" repeatDelay="0" >
+			<s:motionPaths>
+				<s:SimpleMotionPath id="pth" property="verticalScrollPosition" />
+			</s:motionPaths>
+		</s:Animate>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.Emoticons;
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.controller.muc.MUCInterfaceManager;
+			import net.gltd.gtms.events.muc.ChannelItemEvent;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.model.im.StreamMessagesModel;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.utils.FilterArrayCollection;
+			import net.gltd.gtms.view.im.contactList.BuddyItemRenderer;
+			import net.gltd.gtms.view.muc.ChannelItemRenderer;
+			import net.gltd.gtms.view.muc.ChannelListBase;
+			
+			import flashx.textLayout.elements.DivElement;
+			import flashx.textLayout.elements.InlineGraphicElement;
+			import flashx.textLayout.elements.LinkElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			import flashx.textLayout.events.FlowElementMouseEvent;
+			import flashx.textLayout.formats.TextLayoutFormat;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.collections.ArrayCollection;
+			import mx.controls.DateField;
+			import mx.events.FlexEvent;
+			import mx.messaging.Channel;
+			import mx.messaging.ChannelSet;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.Message;
+			import org.igniterealtime.xiff.events.MessageEvent;
+			
+			import spark.components.Window;
+
+			private		var		_model			:StreamMessagesModel,
+								_hasHistory		:Boolean,
+								_selected		:Boolean,
+								_today			:Date = new Date(),
+								_moveScroll		:Boolean,
+								_lastMsg		:Object	= {user:"",date:"",readed:false},
+								_lastEntry		:DivElement,
+								_emoticons		:Emoticons = Emoticons.getInstance(),
+								
+								_colors			:Object = {
+									me: {t:0x14478e,b:SettingsManager.CHAT_COLOR},
+									buddy: {t:0xd84f0c,b:SettingsManager.CHAT_COLOR},
+									info: {t:0x08F8F8F,b:0x08F8F8F}
+								},
+								_availabelColors:Array = [0x66CCFF,0x55DC55,0xFF9900,0x9999CC,0x993399,0x669999,0xd84f0c,0xCC66FF,0x339900,0x66CCCC,0x0099CC,0x9966CC,0x663366,0x666600];
+								
+			[Bindable]
+			private		var		_msgTF			:TextFlow =  new TextFlow();
+			
+			[Bindable][Embed(source="../assets/dot.png")]
+			private var dot:Class;
+			
+			public function set model( m:StreamMessagesModel ):void {
+				_model = m;
+				
+				_model.stream.addEventListener(MessageEvent.MESSAGE,onMessage);
+				_model.stream.addEventListener(Event.CHANGE,initParticipantsList);
+				
+				for (var i:uint = 0; i<_model.stream.getMessagesLength(); i++){
+					shapeMessage  ( _model.stream.getMessage( i ) );
+				}
+				initParticipantsList();
+			//	initOccupan
+				//	ts( _model.stream.getParticipants().concat( _model.stream.getChannels() ) );
+			}
+			
+			[Bindable]
+			public function get model( ):StreamMessagesModel {
+				return _model;
+				
+			}
+			public function onRemoved():void {
+				try {
+					model.streamView = null;
+					_model.stream.removeEventListener(MessageEvent.MESSAGE,onMessage);
+					_model.stream.removeEventListener(Event.CHANGE,initParticipantsList);
+					_participantList.removeEventListener(ChannelItemEvent.EVENT_SHOWCONTEXT,ChannelListBase.CHANNEL_CONTEXT_MENU);
+				}catch (error:Error){
+					
+				}
+				
+			}
+			
+			[Bindable]
+			public function get hasHistory():Boolean {
+				return _hasHistory;
+			}
+			public function set hasHistory(b:Boolean):void {
+				_hasHistory = b;
+			}
+			
+			private function initParticipantsList(event:Event=null):void {
+				var _bh:buddiesHolder = buddiesHolder.getInstance();
+				var part:Array =  _model.stream.getParticipants();
+				initOccupants([]);
+				var i:uint;
+				for (i=0;i<part.length;i++){
+					try {
+						occupants.addItem( {data:_bh.getBuddy(part[i]), label:_bh.getBuddy(part[i]).nickname} );
+					}catch (erro:Error){
+						occupants.addItem( {data: new BuddyModel(part[i],[],IMBuddyModel.BUDDY_KIND,null), label:part[i].split("@")[0] } );
+					}
+				}
+				var allChannels:FilterArrayCollection = MUCInterfaceManager.Channels();
+				var myChannels:Array = _model.stream.getChannels();
+				var channel:ChannelModel
+				for (i=0;i<myChannels.length;i++){
+					try {
+						channel = allChannels.getItemByID(  myChannels[i]  )  as ChannelModel;
+					}catch (erro:Error){
+
+					}
+					if (channel == null)channel =  new ChannelModel(new EscapedJID(myChannels[i]).node,myChannels[i],ChannelModel.KIND_CHANNEL );
+					occupants.addItem(channel);
+				}
+				occupants.refresh();
+			}
+			
+			private function onMessage(event:MessageEvent):void {
+				
+				
+				shapeMessage( event.data );
+				try {
+					if ( !(this.parentApplication as Window).nativeWindow.active || !selected){
+						model.markUser(true);
+					}
+				}catch (error:Error){
+					if (!selected)	model.markUser(true);
+				}
+				
+			}
+			
+			
+			protected function initScroll(event:FlexEvent):void
+			{
+				
+			}
+			
+			public function set selected(b:Boolean):void {
+				_selected = b;
+				//hasUnreaded = false;
+				if (b) model.hasUnreaded = true;
+				model.markUser(false)
+			}
+			public function get selected():Boolean {
+				return _selected;
+			}
+			public function get moveScroll():Boolean {
+				return _moveScroll;
+			}
+			public function set moveScroll(b:Boolean):void {
+				_moveScroll = b;
+			}
+			
+			/// MEssage 
+			
+			public function shapeMessage(m:Message,from:String="buddy",readed:Boolean=false,displayOnTop:Boolean=false,time:Date=null):void {
+				if (m == null)return;
+				var d:Date;
+				var participantName:String = "";
+				var channelName:String = m.subject;
+				
+				if (time != null) d = time;
+				else if (m.time == null) d = new Date();
+				else d = m.time;
+				
+				try {
+					participantName = buddiesHolder.getInstance().getBuddy( m.from.resource+"@"+m.to.domain).nickname;
+				}catch (error:Error){
+					participantName = m.from.resource;
+				}
+				
+				var dn:String = channelName + " ("+ participantName+")";
+				/*try {
+					channelName = buddiesHolder.getInstance().getBuddy(m.from.resource+"@"+m.from.domain).nickname;
+					if (channelName == null)channelName = m.from.bareJID;
+				}catch (error:Error){
+					channelName = m.from.bareJID;
+				}*/
+				
+				displayMessage(dn,d,m.body,m.from.toString(),{channelID:m.from.bareJID,messageID:m.id},readed,displayOnTop);
+				if (!readed && selected && from == "buddy"){
+					try {
+						if ( (this.parentApplication as Window).nativeWindow.active){
+							model.markUser(false);
+						}
+						
+					}catch (error:Error){
+						model.markUser(false);
+					}
+				}
+				
+			}
+			private function getDate(date:Date):String {
+				var min:String = date.getMinutes().toString();
+				if (min.length ==1) min = "0"+min;
+				var h:String = date.getHours().toString();
+				if (h.length ==  1)h = "0"+h;
+				if (date.date < _today.date || date.month != _today.month){
+					return DateField.dateToString(date, "DD/MM/YYYY")+", "+h+ ":"+min;
+				}
+				return h+ ":"+min;
+			}
+			private function displayMessage(_from:String,_date:Date,_body:String,color:String,messageID:Object,readed:Boolean=false,displayOnTop:Boolean=false):void {
+				try {
+					
+					moveScroll = !displayOnTop;
+					model.description = _body.slice(0,80);
+				
+					if (_lastMsg.user != _from+displayOnTop.toString() || Math.abs(Math.floor((_lastMsg.date.time -_date.time)/60000)) > 1 ){
+						if (_colors[color] == undefined){
+							if (_availabelColors.length == 0)_colors[color]  = {t: Math.floor (Math.random()*0xCFCCFC) };
+							else _colors[color]= {t:_availabelColors.shift()};//{ t:Math.floor (Math.random()*0xCCCCCC) + 0x111112 }
+						}
+						_msgTF.addChild( msgTitleElement(_from,_colors[color].t,getDate(_date),messageID) );
+					}
+					_lastEntry.addChild( msgBodyElement(_body) );
+				
+					
+					_lastMsg.user = _from+displayOnTop.toString();
+					_lastMsg.date = _date;
+					_lastMsg.readed = readed;
+					
+					callLater(scrollDown,[moveScroll] );
+				}catch (err:Error){
+					trace (err.getStackTrace());
+				}
+			}
+			
+			private function msgTitleElement(nickname:String, nickcolor:int, date:String, messageID:Object,onTop:Boolean=false ):DivElement {
+				
+				
+				var msg:DivElement = new DivElement();
+				msg.paddingLeft = msg.paddingRight = 5;
+				
+				if (_lastEntry!=null){
+					createLineElement(onTop);
+				}else {
+					msg.paddingTop = -20;
+				}
+				var titleDiv:DivElement = new DivElement();
+				titleDiv.lineHeight  = SettingsManager.CHAT_FONT_SIZE + 7;
+				
+				var nickP:ParagraphElement = new ParagraphElement();
+				nickP.color = nickcolor;
+				//	nickP.fontWeight = "bold";
+				var link:LinkElement = new LinkElement();
+				var tf:TextLayoutFormat =	new TextLayoutFormat();
+				tf.color = nickcolor;
+				tf.textDecoration = "underline";
+				
+				var tf1:TextLayoutFormat =	new TextLayoutFormat();
+				tf1.color = nickcolor;
+				tf1.textDecoration = "none";
+				
+				link.linkHoverFormat = tf;
+				link.linkNormalFormat = tf1;
+				link.addEventListener(FlowElementMouseEvent.CLICK,onGoToMessageSource(messageID))
+				
+				var nickSpan:SpanElement =  new SpanElement();
+				nickSpan.text = nickname;
+				link.addChild(nickSpan);
+				nickP.addChild(link);
+			
+				var dateP:ParagraphElement = new ParagraphElement();
+				dateP.lineHeight = -SettingsManager.CHAT_FONT_SIZE+3;
+				dateP.color = 0xc1c1c1;
+				dateP.textAlign = "right";
+				dateP.fontSize = SettingsManager.CHAT_FONT_SIZE-1;
+				var dateSpan:SpanElement = new SpanElement();
+				dateSpan.text = "["+date+"]";
+				dateP.addChild(dateSpan);
+				
+				nickP.paddingRight = 44;
+				titleDiv.addChild(nickP);
+				titleDiv.addChild(dateP);
+				
+				
+				msg.addChild(titleDiv);
+				//msg.linkHoverFormat
+				_lastEntry = msg;
+				
+				return msg;
+			}
+			private function onGoToMessageSource(id:Object):Function {
+				return function (event:FlowElementMouseEvent):void {
+					//model.stream.
+					MUCInterfaceManager.GoToChannel(id.channelID,id.messageID);
+				}
+			}
+			private function msgBodyElement(messageBody:String):ParagraphElement {
+				
+				var p:ParagraphElement = new ParagraphElement();
+				var hasIco:Boolean = false;
+				var nodes:Array = _emoticons.find(messageBody);
+				for (var i:uint = 0; i<nodes.length;i++){
+					p.addChild(nodes[i]);
+					if (nodes[i] is InlineGraphicElement){
+						hasIco = true
+					}
+				}
+				p.paddingLeft = 4;
+				if (hasIco){
+					p.lineHeight = 30;
+				}else {
+					p.lineHeight = SettingsManager.CHAT_FONT_SIZE+6;
+				}
+				return p;
+			}
+			private function createLineElement(onTop:Boolean):void {
+				//if (!onTop && !_msgTF.getChildAt(1))return;
+				var line:InlineGraphicElement = new InlineGraphicElement();
+				line.source = dot;
+				BindingUtils.bindProperty(line,"width",msgDisplay,"width")
+				line.height = .5;
+				var pn:ParagraphElement = new ParagraphElement();
+				
+				pn.addChild(line);
+				
+				 _msgTF.addChild(pn);
+				
+			}
+			
+			
+			private function scrollDown(ms:Boolean,immediately:Boolean=false,keepSpace:Number=0):void {
+				try {
+					if (!ms){
+						return;
+					}
+					
+					_rtG.validateNow();
+					if (immediately){
+						msgScroll.viewport.verticalScrollPosition = Math.max (msgScroll.verticalScrollBar.minimum,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+					}
+					else {
+						pth.valueTo = Math.max (msgScroll.verticalScrollBar.minimum,(msgScroll.verticalScrollBar.maximum) - keepSpace);
+						anim.play();
+					}
+				}catch (error:Error){}
+				
+			}
+			
+			[Bindable]private var occupants:ArrayCollection;
+			public function initOccupants(source:Array):void {
+				occupants = new ArrayCollection(source);
+				occupants.refresh();
+			}
+			
+			
+			public function getItemRenderer(obj:Object):ClassFactory {
+				if (obj is ChannelModel)return new ClassFactory(ChannelItemRenderer); 
+				return new ClassFactory(BuddyItemRenderer)  
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				_participantList.addEventListener(ChannelItemEvent.EVENT_SHOWCONTEXT,ChannelListBase.CHANNEL_CONTEXT_MENU);
+				model.streamView = this;
+			}
+			
+			
+			public override function set label(s:String):void {
+				
+			}
+			[Bindable]
+			public override function get label():String {
+				var l:String =  model.stream.label;
+				if (model.stream.description != null && model.stream.description.length>0) l +=' - '+model.stream.description;
+				return l;
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	<mx:HDividedBox width="100%" height="100%" top="0" horizontalGap="1" dividerColor="#77db40" dividerAffordance="100"  backgroundAlpha="1" backgroundColor="#FFFFFF">
+	<s:Group width="100%" height="100%">
+	
+		<s:Group width="100%" height="31" left="0" right="0">
+			<s:Rect id="backgroundRect" left="1" top="1" right="1" bottom="1" radiusX="3" radiusY="3" >
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".89"/>	
+						<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+					</s:LinearGradient>
+					
+				</s:fill>
+			</s:Rect>
+			<s:HGroup>
+				
+			</s:HGroup>
+			<s:Label text="{label}"
+					 left="6" right="12" top="9" maxDisplayedLines="1"
+					 styleName="_contactItemDN" color="#FCFCFC" >
+				<fx:Script>
+					<![CDATA[
+						import spark.components.supportClasses.TextBase;
+						TextBase.mx_internal::truncationIndicatorResource = "...";
+					]]>
+				</fx:Script>
+			</s:Label>
+			
+			
+			
+		</s:Group>
+		<s:Scroller horizontalScrollPolicy="off" id="msgScroll" width="100%"  top="32" bottom="0" creationComplete="initScroll(event)"  >
+			<s:viewport>
+				<s:Group clipAndEnableScrolling="true" width="100%" id="_rtG" >
+					<s:RichEditableText id="msgDisplay" 
+										editable="false" minHeight="{msgScroll.height-2}"
+										left="0" right="0" top="0"
+										paddingBottom="8" paddingTop="4" 
+										fontSize="{SettingsManager.CHAT_FONT_SIZE}" color="{SettingsManager.CHAT_COLOR}"
+										textFlow="{_msgTF}"
+										/>
+				</s:Group>
+			</s:viewport>
+			
+		</s:Scroller>
+			
+	</s:Group>
+	<s:Group width="190" minWidth="120" height="100%" id="_participants">
+		
+		<s:Group left="0" right="1" height="31" >
+			<s:Rect id="background2Rect" left="1" top="1" right="1" bottom="1" radiusX="3" radiusY="3" >
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}" alpha=".89"/>	
+						<s:GradientEntry  color="{styleManager.getMergedStyleDeclaration('.windowContentBacgroundColor').getStyle('backgroundColor')}"/>	
+					</s:LinearGradient>
+					
+				</s:fill>
+			</s:Rect>
+			<s:Label text="Participants"
+					 color="#FCFCFC" left="6" right="12" top="9"/>
+		</s:Group>
+		<s:List left="0" right="0" bottom="0" top="33" dataProvider="{occupants}" horizontalScrollPolicy="off"  creationComplete="init(event)"
+				contentBackgroundAlpha="1" contentBackgroundColor="#FFFFFF" borderVisible="false"
+				itemRendererFunction="getItemRenderer" name="_streamParticipants" id="_participantList"
+				 >
+			<s:layout>
+				<s:VerticalLayout gap="1" paddingLeft="2"  paddingRight="2"/>
+			</s:layout>
+		</s:List>
+		<mx:VRule height="100%" strokeColor="0xCDCDCD" left="0"/>
+	</s:Group>
+	
+		</mx:HDividedBox>
+	
+	
+</s:NavigatorContent>

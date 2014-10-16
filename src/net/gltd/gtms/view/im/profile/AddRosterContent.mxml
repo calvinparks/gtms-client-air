@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%">
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.UserEvent;
+			
+			import mx.collections.ArrayCollection;
+			
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.im.RosterItemVO; 
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable]
+			public var groupCollection:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			public var networksCollection:ArrayCollection  = new ArrayCollection();
+			
+			[Bindable]
+			public var subscriptionType:String;
+			
+			[Bindable]
+			private var nick:String;
+			
+			[Bindable]
+			private var address:String;
+			
+			private var _jid:UnescapedJID;
+			public function set jid(uJID:UnescapedJID):void {
+				var r:RosterItemVO = RosterItemVO.get(uJID);
+				if (r == null){
+					nick = uJID.node;
+				}else {
+					nick = r.nickname;
+				}
+			
+				address = uJID.node;
+				networksCollection = new ArrayCollection();
+				networksCollection.addItem({label:uJID.domain});
+				_jid = uJID;
+				 
+			}
+			public function get jid():UnescapedJID {
+				return _jid;
+			}
+			protected function onNetChange(event:IndexChangeEvent):void
+			{
+				if (_network.selectedIndex > 0){
+					_address.restrict="a-z,A-Z,0-9,.-,@,_"
+					 
+				}else {
+					_address.restrict="a-z,A-Z,0-9,.-,_"
+				
+					if (_address.text.indexOf("@") > -1){
+						_netDisplay.text = "";
+						return;
+					}
+				}
+				if (_network.selectedIndex < 0){
+					_netDisplay.text = "@"+networksCollection.getItemAt(0).label;
+				}else {
+					_netDisplay.text = "@"+_network.selectedItem.label;
+				}
+		
+				
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:layout>
+		<s:VerticalLayout paddingBottom="15" paddingLeft="15" paddingRight="15" gap="8" paddingTop="13"
+							 horizontalAlign="center"
+							/>
+	</s:layout>
+		
+
+			<s:HGroup width="100%" verticalAlign="middle" horizontalAlign="right">
+				<s:Label width="110" text="IM Network:"/>
+				<s:ComboBox	id="_network"	width="100%" dataProvider="{networksCollection}"  enabled="{subscriptionType == UserEvent.SubscriptionTypeAdd}" itemRenderer="net.gltd.gtms.view.utils.ListItem2" change="onNetChange(event)" creationComplete="onNetChange(null)" />
+			</s:HGroup>
+			
+			<s:HGroup width="100%" verticalAlign="middle" horizontalAlign="right">	
+				<s:Label width="110" text="IM Address:"/>
+				<s:TextInput	id="_address"	width="57%" text="@{address}" change="onNetChange(null)" restrict="a-z,A-Z,0-9,.-,_" enabled="{subscriptionType == UserEvent.SubscriptionTypeAdd}"	/>
+				<s:Label id="_netDisplay" width="43%" />
+			</s:HGroup>
+		
+			<s:HGroup width="100%" verticalAlign="middle" horizontalAlign="right">
+				<s:Label width="110" text="Nickname:"/>
+				<s:TextInput	id="_nickname" text="{nick}" width="100%"	/>
+			</s:HGroup>
+			
+			<s:HGroup width="100%" verticalAlign="middle" horizontalAlign="right">
+				<s:Label width="110" text="Group:" />
+				<s:ComboBox		id="_group"		width="100%"	dataProvider="{groupCollection}" itemRenderer="net.gltd.gtms.view.utils.GroupComboItem" labelField="groupName" />
+			</s:HGroup>
+			<s:HGroup width="100%" verticalAlign="middle" horizontalAlign="right">
+				<s:Spacer width="110"/>
+				<s:Label
+					text="{UIphrases.ADD_GROUP_INFO}"
+					fontSize="9"
+					width="100%"	/>
+			</s:HGroup>
+	
+
+	
+</s:Group>
+	

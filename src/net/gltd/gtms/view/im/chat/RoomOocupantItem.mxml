@@ -1,0 +1,75 @@
+<s:ItemRenderer width="100%" autoDrawBackground="false"
+				removedFromStage="onRemoved(event)"
+				rightClick="onRightClick(event)"
+				xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:utils="net.gltd.gtms.view.im.utils.*">
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.GUI.contextMenu.ContextMenuItem;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.data.im.RosterItemVO;
+			import org.igniterealtime.xiff.events.PropertyChangeEvent;
+		
+		[Bindable]
+		private var nickname:String;
+		[Bindable]
+		private var ico:Class;
+		private var roster:RosterItemVO;
+		
+		public var menuItems:Vector.<net.gltd.gtms.GUI.contextMenu.ContextMenuItem>;
+		public override function set data(val:Object):void {
+			super.data = val;
+			try {
+				try {
+					nickname = (data as RoomOccupant).rosterItem.nickname;
+				}catch (error:Error){
+					nickname = data.nickname;
+				}
+				if (roster != null) onRemoved(null);
+				roster = val.rosterItem;
+				ico = ShowStatusManager.getShowIco(roster)
+				roster.addEventListener(PropertyChangeEvent.CHANGE,onPropChage);
+				
+				var bd:BuddyModel = buddiesHolder.getInstance().getBuddy(roster.jid.bareJID);
+				menuItems = bd.renderMenuItemsFunction(bd);
+				if ( (val as RoomOccupant).role != Room.ROLE_MODERATOR &&  (val as RoomOccupant).room.role == Room.ROLE_MODERATOR ){
+					menuItems.push( new net.gltd.gtms.GUI.contextMenu.ContextMenuItem("Ban "+bd.nickname,null,true,true,ban,[val],null) );
+				}
+			}catch (error:Error){
+			}
+		}
+		private function ban(occupant:RoomOccupant):void {
+			occupant.room.ban([occupant.jid]);			
+		}
+		private function onPropChage(event:PropertyChangeEvent):void {
+			if (event.name == "show" || event.name == "status" || event.name == "online"){
+				data = super.data;	
+			}
+		}
+		
+		protected function onRemoved(event:Event):void{
+			try {
+				roster.removeEventListener(PropertyChangeEvent.CHANGE,onPropChage);
+			}catch (error:Error){
+		
+			}
+		}
+		
+		protected function onRightClick(event:MouseEvent):void{
+			
+			net.gltd.gtms.GUI.contextMenu.ContextMenu.ShowMenu(event,menuItems)
+		}
+		
+		]]>
+	</fx:Script>
+	<utils:ShowLed showLed="{ico}" _top="-2"/>
+	<s:Label text="{nickname}" styleName="_roomOcupantItem" left="19" />
+</s:ItemRenderer>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extensions:ExtensionContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							 xmlns:s="library://ns.adobe.com/flex/spark" 
+							 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:extensions="net.gltd.gtms.view.app.utilities.extensions.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]
+			public var langsColl:ArrayCollection =  new ArrayCollection([{label:"English",path:"/lang/eng.xml"}])
+		]]>
+	</fx:Script>
+	<s:Label text="Language" top="3"/>
+	<s:HGroup width="100%" top="26">
+		<s:DropDownList id="_select" width="100%" dataProvider="{langsColl}" selectedIndex="0" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer" />
+		<s:Button label="Load" width="60"			/>
+	</s:HGroup>
+	
+</extensions:ExtensionContent>

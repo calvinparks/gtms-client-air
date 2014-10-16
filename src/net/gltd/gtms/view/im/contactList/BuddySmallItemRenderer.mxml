@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" xmlns:utils="net.gltd.gtms.view.im.utils.*"
+				rollOver="onTT(event)"
+				rollOut="onTT(event)"
+				mouseDown="onTT(event)"
+				doubleClick="clickEvent(event)"
+				rightClick="clickEvent(event)" cacheAsBitmap="true" 
+				width="100%" maxHeight="31" 
+			
+			
+				>
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected" />
+		<s:State name="hovered" />
+		<s:State name="sel" />
+		<s:State name="glow" basedOn="normal" />
+		
+		<s:State name="show" />
+		<s:State name="close" />
+		
+	</s:states>
+	
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ContactEvent;
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.model.contact.GroupModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.im.AvatarModel;
+			
+			import mx.events.FlexEvent;
+			import mx.events.ToolTipEvent;
+			
+			import spark.components.supportClasses.TextBase;
+			
+			
+			protected var tO:uint;
+			
+			//public var dataSource:Object
+			;
+			public var group:String;
+			
+			
+			[Bindable]
+			public 	var gModel:GroupModel;
+			
+			public var sortKey:int = 100;
+			
+			
+			protected function cc(event:FlexEvent):void
+			{
+				try {
+					this.setCurrentState(this.states[uint(gModel.isClosed)].name,true);
+					
+				}catch (error:Error){}
+			}
+			
+			
+			public override function set data(val:Object):void {
+				
+				try {
+					if (val.data is GroupModel){
+						try {
+							super.data = val;
+							gModel = val.data as GroupModel;
+							if (gModel != null)	sortKey = gModel.sortKey;
+							
+							cc(null);
+						}catch  (error:Error){
+							
+						}
+					}else {
+						gModel = null;
+					
+						try {
+							//dataSource = val;
+							super.data = val.data;
+							group = val.group;
+						}catch (error:Error){
+							
+						}
+					}
+				}catch (em:Error){
+					
+				}
+			}
+				
+			private function onToolTip(event:ToolTipEvent):void {
+				var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+				e.id = data.id;
+				e.toolTip = event;
+				dispatchEvent(e);
+				
+			}
+			private function clickEvent(event:MouseEvent):void
+			{ 
+				
+				if (data.clickFunction!=null)data.clickFunction(event);
+				
+			}
+			protected function onTT(event:MouseEvent):void
+			{
+				try {
+					var e:ContactItemEvent = new ContactItemEvent(ContactItemEvent.TOOL_TIP, true);
+					e.id = data.id;
+					e.mouseEvent = event;
+					if (event.type == MouseEvent.ROLL_OVER){
+						tO = setTimeout(dispatchEvent,1700,e);
+						return;
+					}
+					
+					dispatchEvent(e);
+					clearTimeout(tO);
+				}catch (error:Error){}
+				}
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+			
+		
+		/*	
+			protected function itemrenderer1_creationCompleteHandler(event:FlexEvent):void
+			{
+				try {
+					//dataSource = val;
+					super.data = data.data;
+					group = data.group;
+				}catch (error:Error){
+					
+				}
+			}
+			*/
+			
+		
+		]]>
+	</fx:Script>
+	
+	
+		<s:SkinnableContainer width="100%" height="100%" 
+							  styleName="_contactItemRendererSkin"
+							  styleName.selected="_contactItemRendererSelectedSkin"
+							  styleName.hovered="_contactItemRendererHoveredSkin" includeInLayout="{gModel==null}" visible="{gModel==null}"
+							  >
+			<s:Group width="100%" 
+					 left="3" bottom="3" top="3" right="3">
+				<s:BitmapImage
+					left="1"
+					width="23" height="22"
+					id="_avatar" scaleMode="zoom"
+					verticalAlign="middle" horizontalAlign="center"
+					source="{data.avatar.ico}"
+					smooth="true" smoothingQuality="default" />
+				
+				<utils:ShowLed showLed="{data.show}"
+							   includeInLayout="{data is IMBuddyModel}" visible="{data is IMBuddyModel}"	
+							   left="27"
+							   top="4"
+							   />
+				<s:Label text="{label}" maxDisplayedLines="1" left="46" top="7" right="9" />
+				<s:HGroup >
+					
+					<!--s:Label text="{data.status}"
+							 styleName="_contactItemStatus"
+							  maxDisplayedLines="1"
+							 includeInLayout="{data is IMBuddyModel}" visible="{data is IMBuddyModel}" /-->
+				</s:HGroup>
+				
+			</s:Group>
+			<s:BitmapImage height="17" width="17" right="4" top="5"
+						   scaleMode="stretch"
+						   smooth="true" smoothingQuality="default"
+						   id="_ico"
+						   source="{data.ico}"
+						   includeInLayout="{data.ico!=null}"  visible="{data.ico!=null}" />
+			
+			<mx:HRule bottom="-1" height="1" width="100%" 
+					  strokeColor="{ColorReferences.ContactsListBackgroundColor}"
+					  shadowColor="{ColorReferences.ContactsListBackgroundColor}"
+					  />
+		</s:SkinnableContainer>
+		
+	
+</s:ItemRenderer>

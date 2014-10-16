@@ -1,0 +1,36 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace modules "modules.*";
+
+
+@font-face {
+	src:url("../assets/font/MyriadPro-Regular.otf");
+	fontFamily:appEmbedNoCFF;
+	embedAsCFF: false;
+	advancedAntiAliasing: true;
+}
+@font-face {
+	src:url("../assets/font/MyriadPro-Regular.otf");
+	fontFamily:appEmbed;
+	embedAsCFF: true;
+	advancedAntiAliasing: true;
+}
+@font-face {
+	src:url("../assets/font/MyriadPro-Semibold.otf");
+	fontFamily:appEmbed;
+	embedAsCFF: true;
+	fontWeight: bold;
+}
+@font-face {
+	src:url("../assets/font/MyriadPro-It.otf");
+	fontFamily: appEmbed;
+	embedAsCFF: true;
+	fontStyle: italic;
+}
+
+global
+{
+	fontFamily: appEmbed;
+	fontLookup: embeddedCFF;
+}

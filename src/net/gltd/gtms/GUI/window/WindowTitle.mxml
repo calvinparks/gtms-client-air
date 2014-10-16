@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" xmlns:utils="net.gltd.gtms.view.utils.*">
+	<fx:Declarations>
+		<fx:String id="label" />
+		<fx:uint id="fontSize">13</fx:uint>
+		<fx:uint id="right_space"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import spark.components.supportClasses.TextBase;
+			TextBase.mx_internal::truncationIndicatorResource = "...";
+			
+		]]>
+	</fx:Script>
+	<s:Label top="5" left="2" right="{right_space}" text="{label}" fontSize="{fontSize}" styleName="windowTitle"  maxDisplayedLines="1" />
+	
+</s:Group>

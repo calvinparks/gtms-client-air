@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fx:Object xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:app="net.gltd.gtms.controller.app.*" xmlns:xmpp="net.gltd.gtms.controller.xmpp.*" xmlns:modules="modules.*" xmlns:im="net.gltd.gtms.controller.im.*" xmlns:notification="net.gltd.gtms.controller.notification.*" xmlns:UEM="net.gltd.gtms.GUI.UEM.*" xmlns:muc="net.gltd.gtms.controller.muc.*"    >
+	
+	<!-- Config -->
+	
+	<fx:Declarations>
+		<app:ApplicationManager id="applicationManager" />
+		
+		<xmpp:Connection		/>
+		<xmpp:ConnectionManager connectionType="socket"	/>
+		<xmpp:RosterManager		/>
+		<xmpp:PresenceManager	/>
+		<xmpp:DiscoManager		/>
+		<xmpp:ArchiveManager	/>
+		<im:ContactListManager	/>
+		<im:ShowStatusManager	/>
+		<im:ChatMessageManager	/>
+		<im:RoomManager			/>
+		
+		<UEM:UEM		/>
+		
+		<im:ProfileManager		/>
+		<im:SubscriptionManager	/>
+	
+		<app:SoundsController	/>
+		
+		<muc:MUCManager	/>
+		<muc:MUCInterfaceManager/>
+		<muc:MUCXMPPManager		/>
+		<muc:StreamsManager 	/>
+		
+	</fx:Declarations>
+	
+</fx:Object>

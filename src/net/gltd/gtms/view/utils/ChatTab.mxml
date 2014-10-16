@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="80" toolTip="{data.label}"
+				stateChangeComplete="onState(event)" creationComplete="onState(event)"
+				autoDrawBackground="false" xmlns:parsley="http://www.spicefactory.org/parsley" >
+	<fx:Declarations>
+		<!--parsley:Configure/-->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.UserEvent;
+			
+			import mx.events.FlexEvent;
+		
+			[Bindable]
+			private var normalColor:uint = 0x6d9cc2;
+			
+			
+	
+			protected function closeClick(event:MouseEvent):void
+			{
+				var uev:UserEvent = new UserEvent(UserEvent.USER_CLOSE_CHAT);
+				uev.recipientID = data._id;
+				this.parent.parent.parent.dispatchEvent(uev)
+			}
+			protected function onState(event:FlexEvent):void
+			{
+				if (currentState == "selected"){
+					data.tabColor = 0x6d9cc2;
+				}
+				data.tabCurrentState = currentState;
+				
+				try {
+					cont.skin.setCurrentState(currentState);
+				}catch (error:Error){
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="selected" />
+		<s:State name="hovered" basedOn="normal"  />
+	</s:states>
+	
+	<!-- layer 1: shadow -->
+	<!--- @private -->
+	
+	
+	<!-- layer 2: fill -->
+	<!--- @private -->
+<s:SkinnableContainer id="cont" left="0" right="0" top="0" bottom="0"  styleName="chatTab">
+ 
+	<!-- layer 8: text -->
+	<!--- @copy spark.components.supportClasses.ButtonBase#labelDisplay -->
+	<s:HGroup  left="9" right="26" top="2" verticalAlign="bottom" height="18">
+		<s:Image source="@Embed('../assets/typing.png')" visible="{data.bd.composing}" includeInLayout="{data.bd.composing}" id="typingIco"/>
+		<s:Label text="{data.label}" id="labelDisplay" 
+				 textAlign="left"
+				 verticalAlign="bottom"
+				 maxDisplayedLines="1"
+				 verticalCenter="1"
+				 color.normal="{data.tabColor}"
+				 color.selected="0x00ffff"
+		
+				 fontWeight.normal="normal"
+				 fontWeight.selected="normal"
+			 
+				 >
+	</s:Label>
+		
+	</s:HGroup>
+	
+	<s:Button styleName="closeTabButtonSkin"
+			  id="closeButton"
+			  buttonMode="true"
+			  click="closeClick(event)"
+			  right="6" verticalCenter="0" width="10" />
+</s:SkinnableContainer>
+	
+</s:ItemRenderer>

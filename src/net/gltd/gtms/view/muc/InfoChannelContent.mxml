@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" creationComplete="init(event)">
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Metadata>
+
+	</fx:Metadata>
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.muc.MUCXMPPManager;
+			import net.gltd.gtms.controller.xmpp.ArchiveManager;
+			import net.gltd.gtms.model.muc.ChannelModel;
+			import net.gltd.gtms.view.im.chatv2.Occupantv2TabItemRenderer;
+			import net.gltd.gtms.view.im.chatv2.RoomNavigatorContent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Spacer;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Label;
+			import spark.components.List;
+			
+			import org.igniterealtime.xiff.conference.RoomOccupant;
+			import org.igniterealtime.xiff.data.muc.MUC;
+			
+			
+			[Bindable]
+			public	var item:ChannelModel;
+			
+			protected function close_clickHandler(event:MouseEvent):void
+			{
+				this.parentApplication['close']();
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				var lb:Label;
+				var val:Label;
+				
+				
+				lb = new Label();
+				lb.text ="Name:"
+				
+				val = new Label();
+				val.text = item.name;
+				_left.addElement(lb)
+				_right.addElement(val)
+				
+				for (var i:uint = 0; i< item.details.x.field.length; i++){
+					if (item.details.x.field[i].type == "hidden")continue;
+					
+					lb = new Label();
+					lb.text = item.details.x.field[i].label+":";
+					
+					val = new Label();
+					
+					
+					
+					if (item.details.x.field[i].varible == "muc#roominfo_occupants" && (item.room != null && item.room.active)){
+						val.text = item.room.length.toString();
+					}else if (item.details.x.field[i].label == "Creation date"){
+						var dtString:String = item.details.x.field[i].value;
+						dtString = dtString.slice(0,4)+"-"+dtString.slice(4,6)+"-"+dtString.slice(6,8)+dtString.slice(8,dtString.length);
+						val.text = ArchiveManager.convertToDate(dtString)['toUTCString']();
+					}else {
+						val.text = item.details.x.field[i].value;
+					}
+					lb.setStyle("fontWeight","bold");
+					_left.addElement(lb)
+					_right.addElement(val)
+				}
+				var sp:Spacer = new Spacer();
+				sp.height = 10;
+				_extenstions.addElement(sp);
+				for (i = 0; i< item.details.feature.length; i++){
+					if ( MUCXMPPManager.muc_dictionary[item.details.feature[i].feature]==undefined)continue;
+					lb = new Label();
+					lb.text = "- "+ MUCXMPPManager.muc_dictionary[item.details.feature[i].feature]
+					_extenstions.addElement(lb);
+				}
+				
+				if (item.room != null){
+					if (item.room.length > 0){
+						sp = new Spacer();
+						sp.height = 10;
+						_extenstions.addElement(sp);
+						lb = new Label();
+						lb.text = "Users in room:";
+						_extenstions.addElement(lb);
+						
+					}
+					
+					
+					
+					var occupants:ArrayCollection = new ArrayCollection();
+					var list:List = new List();
+					list.styleName = RoomNavigatorContent
+					list.percentWidth = 100;
+					list.dataProvider = occupants;
+					list.itemRenderer = new ClassFactory(Occupantv2TabItemRenderer);
+					list.setStyle("contentBackgroundAlpha",1);
+					list.setStyle("contentBackgroundColor","#FFFFFF");
+					list.setStyle("borderVisible",false);
+					list.setStyle("horizontalScrollPolicy","off");
+					
+					var lay:VerticalLayout = new VerticalLayout();
+					lay.paddingTop = 1;
+					lay.paddingBottom = 1;
+					lay.paddingLeft = 1;
+					lay.paddingRight = 1;
+					lay.gap = 2;
+					list.layout = lay;
+					
+					_extenstions.addElement(list);
+					
+					for (i = 0; i< item.room.length; i++){
+						if (item.room.getItemAt(i) is RoomOccupant){
+							occupants.addItem( item.room.getItemAt(i) as RoomOccupant );
+						}
+					}
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<s:Scroller id="_scroller" left="0" right="0" top="0" bottom="0" >
+		<s:Group  width="100%" id="_extenstions">
+			<s:layout>
+				<s:VerticalLayout	gap="10"
+									paddingBottom="10"
+									paddingTop="12"
+									paddingLeft="12"
+									paddingRight="10"/>
+			</s:layout>
+			<s:Group  width="100%" >
+				<s:layout>
+				<s:HorizontalLayout gap="10"
+									 />
+				</s:layout>
+				<s:VGroup id="_left" width="45%"/>
+				<s:VGroup id="_right"/>
+				
+				
+				
+			</s:Group>
+		</s:Group>
+	</s:Scroller>
+	<s:HGroup bottom="-35" right="2">
+		<s:Button label="Close" click="close_clickHandler(event)"/>
+	</s:HGroup>
+	
+</s:Group>

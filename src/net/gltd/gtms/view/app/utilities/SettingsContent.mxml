@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:NavigatorContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:s="library://ns.adobe.com/flex/spark" 
+					xmlns:mx="library://ns.adobe.com/flex/mx" 
+					icon="{_ico}"
+					label="{_label}"
+					xmlns:app="net.gltd.gtms.controller.app.*"
+					xmlns:utils="net.gltd.gtms.view.utils.*"
+					addedToStage="init(event)"
+					xmlns:view="net.gltd.gtms.view.*"
+					>
+
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.model.app.AllertSettingsModel;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			[Bindable]
+			[Embed(source="../assets/skins/main_tabs_ico/settings.png")]
+			public var _ico:Class;
+			
+			[Bindable]
+			public var _label:String = "Settings";
+			
+			[Bindable]
+			private var _alertsColl		:ArrayCollection;
+
+			[Bindable]
+			private	var	changed			:Boolean = false;
+			[Bindable]
+			private	var	def				:Boolean = true;
+			
+			[Bindable]
+			private	var	connections		:ArrayCollection = new ArrayCollection([
+				{label:"XMPP Connection",value:0,port:5222},
+				{label:"XMPP TLS Connection",value:1,port:5222},
+				{label:"XMPP BOSH Connection",value:2,port:7070},
+				])
+		
+			private function onFontSizeSpinner(event:Event):void {
+				fontSizeDisplay.text = fontSizeSpinner.value.toString(); 
+			} 
+			
+			protected function init(event:Event):void
+			{
+				try
+				{
+					
+					_alertsColl = new ArrayCollection();
+					for (var ind:String in SettingsManager.ALLERTS){
+						var n:String	= SettingsManager.ALLERTS[ind].name;
+						var l:String	= SettingsManager.ALLERTS[ind].label;
+						var s:Boolean	= SettingsManager.ALLERTS[ind].sound;
+						var p:Boolean	= SettingsManager.ALLERTS[ind].popup;
+						var w:Boolean	= SettingsManager.ALLERTS[ind].window;
+						var t:uint		= SettingsManager.ALLERTS[ind].time;
+						
+						var pe:Boolean	= SettingsManager.ALLERTS[ind].popupEnabled;
+						var se:Boolean	= SettingsManager.ALLERTS[ind].soundEnabled;
+						var we:Boolean	= SettingsManager.ALLERTS[ind].windowEnabled;
+						var m:AllertSettingsModel = new AllertSettingsModel(n,l,s,p,w,t,pe,se,we);
+						m.addEventListener(Event.CHANGE,onChange);
+						_alertsColl.addItem( m );
+						
+					}
+					
+				}catch (error:Error){
+					trace (error.getStackTrace())
+				}
+			}
+			private function onChange(event:Event):void {
+				changed = true;
+			}
+			private function onChangeConn(event:Event):void {
+				onChange(null);
+				_port.text = _connections.selectedItem.port;
+			}
+			protected function onReset(event:MouseEvent):void
+			{
+				colorValue 				=	SettingsManager.CHAT_COLOR;
+				fontSizeValue			=	SettingsManager.CHAT_FONT_SIZE;
+				reconnectValue			=	SettingsManager.RECONNECT_TIME_SECONDS;
+				idleValue				=	SettingsManager.IDLE_TIME_SECONDS;
+				
+				_compression.selected = SettingsManager.connectionCompress;
+				_connections.selectedIndex = SettingsManager.connectionType;
+				_port.text = SettingsManager.connectionPort.toString();
+				
+				/*for (var i:uint = 0; i<_alerts.dataProvider.length;i++){
+					_alerts.dataProvider.getItemAt(i).time =  SettingsManager.ALLERTS[i].time;
+					_alerts.dataProvider.getItemAt(i).sound =  SettingsManager.ALLERTS[i].sound;
+					_alerts.dataProvider.getItemAt(i).popup =  SettingsManager.ALLERTS[i].popup;
+				}*/
+				init(null);
+				changed = false;
+				
+			}
+			protected function onApply(event:MouseEvent):void
+			{
+				var bytes:ByteArray;
+				
+				bytes = new ByteArray();
+				bytes.writeInt(colorValue);
+				EncryptedLocalStore.setItem("chatColor",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeInt(fontSizeValue);
+				EncryptedLocalStore.setItem("chatFontSize",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeInt(reconnectValue*1000);
+				EncryptedLocalStore.setItem("reconnectTime",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeInt(idleValue*1000);
+				EncryptedLocalStore.setItem("idleTime",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeBoolean(_compression.selected);
+				EncryptedLocalStore.setItem("connCompress",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeInt(_connections.selectedItem.value);
+				EncryptedLocalStore.setItem("connType",bytes);
+				
+				bytes = new ByteArray();
+				bytes.writeInt(Number(_port.text));
+				EncryptedLocalStore.setItem("connPort",bytes);
+				
+				
+				
+				
+				for (var i:uint = 0; i<_alerts.dataProvider.length;i++){
+				
+					bytes = new ByteArray();
+					bytes.writeBoolean(_alerts.dataProvider.getItemAt(i).sound);
+					EncryptedLocalStore.setItem(_alerts.dataProvider.getItemAt(i).name+"Sound",bytes);
+					
+					bytes = new ByteArray();
+					bytes.writeBoolean(_alerts.dataProvider.getItemAt(i).popup);
+					EncryptedLocalStore.setItem(_alerts.dataProvider.getItemAt(i).name+"Popup",bytes);
+					
+					bytes = new ByteArray();
+					bytes.writeInt(_alerts.dataProvider.getItemAt(i).time);
+					EncryptedLocalStore.setItem(_alerts.dataProvider.getItemAt(i).name+"Time",bytes);
+					if (_alerts.dataProvider.getItemAt(i).hasOwnProperty("window")){
+						bytes = new ByteArray();
+						bytes.writeBoolean(_alerts.dataProvider.getItemAt(i).window);
+						EncryptedLocalStore.setItem(_alerts.dataProvider.getItemAt(i).name+"Window",bytes);
+					}
+					
+					SettingsManager.ALLERTS[_alerts.dataProvider.getItemAt(i).name] = _alerts.dataProvider.getItemAt(i);
+					
+				}
+				
+				
+				SettingsManager.CHAT_COLOR		= colorValue;
+				SettingsManager.CHAT_FONT_SIZE	= fontSizeValue;
+				SettingsManager.RECONNECT_TIME	= reconnectValue*1000;
+				SettingsManager.IDLE_TIME		= idleValue*1000;
+				
+				SettingsManager.connectionCompress = _compression.selected;
+				SettingsManager.connectionType = _connections.selectedItem.value;
+				SettingsManager.connectionPort = Number(_port.text);
+				changed = false;
+				
+				
+				bytes = new ByteArray();
+				bytes.writeBoolean(event==null);
+				EncryptedLocalStore.setItem("isDefault",bytes);
+				
+				SettingsManager.DEFAULT = event==null;
+				
+				
+			}
+			
+			protected function onRestore(event:MouseEvent):void
+			{
+				SettingsManager.Restore();
+				onReset(null);
+				onApply(null);
+				
+			}
+			
+			
+			private function set fontSizeValue(u:uint):void {
+				changed = true;
+				_fontSizeValue = u;
+			}
+			[Bindable]
+			private function get fontSizeValue():uint {
+				return _fontSizeValue;
+			}
+			
+			private function set colorValue(u:uint):void {
+				changed = true;
+				_colorValue = u;
+			}
+			[Bindable]
+			private function get colorValue():uint {
+				return _colorValue;
+			}
+			
+			
+			
+			private function set reconnectValue(u:uint):void {
+				changed = true;
+				_reconnectValue = u;
+				trace ("new Reconect value",u);
+			}
+			[Bindable]
+			private function get reconnectValue():uint {
+				return _reconnectValue;
+			}
+			
+			
+			
+			private function set idleValue(u:uint):void {
+				changed = true;
+				_idleValue = u;
+			}
+			[Bindable]
+			private function get idleValue():uint {
+				return _idleValue;
+			}
+			
+			private var _fontSizeValue	:uint	= SettingsManager.CHAT_FONT_SIZE;
+			private var _colorValue		:uint	= SettingsManager.CHAT_COLOR;
+			private var _reconnectValue	:uint	= SettingsManager.RECONNECT_TIME_SECONDS;
+			private var _idleValue		:uint	= SettingsManager.IDLE_TIME_SECONDS;
+			
+			private function splitValue(n:Number):String {
+				return (n/1000).toString()
+			}
+			private function splitValue2(n:Number):String {
+				return (n/2).toString()
+			}
+			
+			protected function nnn(event:FlexEvent):void
+			{
+				event.currentTarget.textDisplay.setStyle("color",0xFFFFFF);
+			}
+			
+			 
+			
+		]]>
+	</fx:Script>
+	<s:Scroller  top="10" right="3" left="3" bottom="54">
+		<s:viewport>
+			<s:Group width="100%" >
+				<s:layout>
+					<s:VerticalLayout paddingTop="8" paddingLeft="7" paddingRight="7" paddingBottom="8"/>
+				</s:layout>
+				<s:Label text="Connection:" fontWeight="bold" />
+				<s:Spacer height="2"/>
+				
+				
+				<s:HGroup verticalAlign="middle">
+					<s:Label text="Connection type:" width="210" />
+					<s:DropDownList dataProvider="{connections}" id="_connections" change="onChangeConn(event)" selectedIndex="{SettingsManager.connectionType}" itemRenderer="net.gltd.gtms.view.utils.ListItem2"/>
+				</s:HGroup>
+				<s:Spacer height="1"/>
+				<s:HGroup verticalAlign="middle">
+					<s:Label text="Connection Port" width="210" />
+					<s:TextInput text="{SettingsManager.connectionPort.toString()}" change="onChange(event)" id="_port" restrict="0-9"/>
+				</s:HGroup>
+				<s:Spacer height="1"/>
+				<s:HGroup verticalAlign="middle">
+					<s:Label text="" width="210" />
+					<s:CheckBox label="Use Compression" id="_compression" change="onChange(event)" selected="{SettingsManager.connectionCompress}"/>
+				</s:HGroup>
+				
+				
+				<s:Spacer height="3"/>
+				<mx:HRule width="100%" alpha=".7" />
+				<s:Spacer height="3"/>
+				
+				
+				<s:Label text="Graphics" fontWeight="bold" />
+				<s:Spacer height="2"/>
+				
+				<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+					<s:Label text="IM font size" width="210" />
+					<s:BorderContainer width="44" height="25" backgroundAlpha="0.2" backgroundColor="0x696969" borderColor="0xffffff" borderAlpha=".2">
+						<s:Label text="{fontSizeSpinner.value}" id="fontSizeDisplay" verticalCenter="1" left="6"/>
+						<s:Spinner id="fontSizeSpinner" right="0" verticalCenter="0"
+								   click="onFontSizeSpinner(event);"
+								   value="@{fontSizeValue}"
+								   minimum="8"
+								   maximum="16"
+								   snapInterval="1"/>
+					</s:BorderContainer> 
+					
+					
+				</s:HGroup>
+				<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+					<s:Label text="Colour of IM text" width="210" />
+					<mx:ColorPicker id="_color" labelField="incomming" selectedColor="@{colorValue}" />
+					<!--mx:ColorPicker id="outgoing" labelField="outgoing"  selectedColor="{GlobalConfig.outgoingMessageColor}" change="onColorChange(event)"/-->
+				</s:HGroup>
+				
+				<s:Spacer height="3"/>
+				<mx:HRule width="100%" alpha=".7" />
+				<s:Spacer height="3"/>
+				<s:Label text="Notifications" fontWeight="bold" />
+				<s:Spacer height="2"/>
+				
+				
+				<s:DataGroup  dataProvider="{_alertsColl}" id="_alerts" >
+					<s:layout>
+						<s:VerticalLayout/>
+					</s:layout>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:ItemRenderer autoDrawBackground="false" >
+								<s:layout>
+									<s:VerticalLayout/>
+								</s:layout>
+								
+								<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8" id="it">
+									<s:Label text="{data.label}" width="210" />
+									<s:CheckBox label="sound" id="sound" selected="@{data.sound}" includeInLayout="{data.soundEnabled}" visible="{data.soundEnabled}" />
+									<s:CheckBox label="pop up" id="popup" selected="@{data.popup}" includeInLayout="{data.popupEnabled}" visible="{data.popupEnabled}"/>
+									<view:TimeSpinner enabled="{popup.selected}" value="@{data.time}" includeInLayout="{data.popupEnabled}" visible="{data.popupEnabled}"   />
+								</s:HGroup>
+								
+								<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8" id="it2" includeInLayout="{data.windowEnabled}" visible="{data.windowEnabled}" >
+									<s:Spacer width="210"/>
+									<s:CheckBox label="open chat window" id="window" selected="@{data.window}"/>
+								</s:HGroup>
+							</s:ItemRenderer>
+						</fx:Component>
+					</s:itemRenderer>
+				</s:DataGroup>
+				
+				<s:Spacer height="3"/><mx:HRule width="100%" alpha=".7" />
+			
+				<s:Spacer height="3"/>
+					
+					<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+						<s:Label text="Reconnect after" width="210" />
+						<s:BorderContainer width="60" height="25" backgroundAlpha="0.2" backgroundColor="0x696969" borderColor="0xffffff" borderAlpha=".2">
+							<s:NumericStepper  
+												width="60"
+												contentBackgroundAlpha="0"
+												id="reconnectAfterSpinner"
+												value="@{reconnectValue}"
+												minimum="5"
+												maximum="7200"
+												snapInterval="1"
+												verticalCenter="0"
+												creationComplete="nnn(event)"
+												/>
+						</s:BorderContainer> 
+						<s:Label text="seconds"/>
+					</s:HGroup>
+					
+					<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+						<s:Label text="Idle after" width="210" />
+						<s:BorderContainer width="60" height="25" backgroundAlpha="0.2" backgroundColor="0x696969" borderColor="0xffffff" borderAlpha=".2">
+							<s:NumericStepper  
+								width="60"
+								contentBackgroundAlpha="0"
+								id="idleAfterSpinner"
+								value="@{idleValue}"
+								minimum="5"
+								maximum="7200"
+								snapInterval="1"
+								verticalCenter="0"
+								creationComplete="nnn(event)"
+								/>
+						</s:BorderContainer> 
+						<s:Label text="seconds"/>
+					</s:HGroup>
+				
+				<!--
+				<s:Spacer height="3"/><mx:HRule width="100%" alpha=".7" /><s:Spacer height="3"/>
+				<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+					<s:Label text="Language" width="210" />
+					<s:DropDownList width="190"/>
+					<s:Button label="Load"/>
+				</s:HGroup>
+				<s:HGroup verticalAlign="middle" gap="8" paddingLeft="8">
+					<s:Label text="Theme" width="210" />
+					<s:DropDownList width="190" />
+					<s:Button label="Load"/>
+				</s:HGroup>
+				-->
+			</s:Group>
+		</s:viewport>
+	</s:Scroller>
+	<mx:HRule width="100%" alpha=".7" bottom="46" left="5" right="5" />
+	<s:HGroup bottom="8" right="10">
+		<s:Button label="{UIphrases.RESTORE_DEFAULT_LABEL}" click="onRestore(event)" enabled="{!SettingsManager.DEFAULT}" />
+		<s:Spacer width="6"/>
+		<s:Button label="{UIphrases.RESET_LABEL}" click="onReset(event)" enabled="{changed}" />
+		<s:Button label="{UIphrases.APPLY_LABEL}" click="onApply(event)" enabled="{changed}" />
+	</s:HGroup>
+			
+		
+			
+	
+</s:NavigatorContent>

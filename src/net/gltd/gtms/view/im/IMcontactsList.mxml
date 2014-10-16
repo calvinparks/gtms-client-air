@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			xmlns:parsley="http://www.spicefactory.org/parsley" 
+			xmlns:contactList="net.gltd.gtms.view.im.contactList.*" 
+			xmlns:utils="net.gltd.gtms.view.utils.*"  creationComplete="init(event)"
+			
+			width="100%"
+			maxHeight="{Number.MAX_VALUE}"
+			>
+	<fx:Declarations>
+		<parsley:Configure/> 
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.GUI.contextMenu.ContextMenu;
+			import net.gltd.gtms.controller.app.ApplicationManager;
+			import net.gltd.gtms.controller.im.ContactListManager;
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.events.ContactEvent;
+			import net.gltd.gtms.events.ContactItemEvent;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+			import net.gltd.gtms.view.im.contactList.ContactGroupContainer;
+			import net.gltd.gtms.view.im.utils.ShowLed;
+			
+			import mx.core.FlexGlobals;
+			import mx.core.UIComponent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;
+			
+			import org.igniterealtime.xiff.vcard.VCardName;
+			
+			import spark.components.Label;
+			
+			
+			[Bindable][Inject]
+			public			var		manager				:ContactListManager;	
+			
+			public	static	const	LIST_NAME			:String = "_contactGroups";
+			
+			protected function init(event:FlexEvent):void
+			{ 
+				if (!_contactList.hasEventListener(ContactItemEvent.TOOL_TIP))_contactList.addEventListener(ContactItemEvent.TOOL_TIP,onTooltip,false,0,true);
+				if (!_contactList.hasEventListener(ContactEvent.GROUP_VISIBLE_CHANGE))_contactList.addEventListener(ContactEvent.GROUP_VISIBLE_CHANGE,onGroupVisibleChange,false,0,true);
+			}
+			
+			public function kill():void {
+				_contactList.dataProvider = null;
+			}
+			
+			protected function onDrag(event:DragEvent):void
+			{
+				if (event.type == DragEvent.DRAG_ENTER){
+					if (manager.getGroupDropItem(event.dragInitiator.name)){
+						DragManager.acceptDragDrop(event.currentTarget as UIComponent);	
+					}else {
+						DragManager.showFeedback("none");
+					}
+				}else if (event.type == DragEvent.DRAG_DROP){
+					var n:String = event.dragInitiator.name;
+					if (n == LIST_NAME){	
+						// group
+					}else if (n == ContactGroupContainer.LIST_NAME){
+						// copy c item
+					}
+					
+				}
+				
+			}
+			protected function labelFunction(val:Object):String
+			{
+				try {
+					return val.data.nickname;
+				}catch (error:Error){
+				
+				}
+				return "";
+			}
+			
+			private function onGroupVisibleChange(event:ContactEvent):void {
+				manager.groupVisibleChange(event.gropup,event.visible)
+			}
+			private function onTooltip(event:ContactItemEvent):void {
+				try {
+					var ptt:ToolTipPanel = ApplicationManager.ToolTipWindow;
+					if (ptt.closed){
+						ptt.open(false)
+						ptt.visible = false;
+						return
+					}
+					if (event.mouseEvent.type != MouseEvent.ROLL_OVER || net.gltd.gtms.GUI.contextMenu.ContextMenu.isOpen){
+						ptt.visible = false;
+						return;
+					}
+					
+					var bd:BuddyModel = buddiesHolder.getInstance().getBuddy(event.id);
+					if (bd == null) {
+						return;
+					}
+					ptt.preInit();
+					ptt.title = bd.nickname;
+					
+					var info:String = "";
+					if (bd.avatar.bmpData)ptt.avatar = (bd.avatar.bmpData);
+					
+					if (bd.hasOwnProperty("roster")){
+						ptt.title += " ("+ bd['roster'].jid.escaped.toString();
+						if (bd['roster'].jid.resource)ptt.title += "/"+bd['roster'].jid.resource;
+						ptt.title += ")";
+					}
+					if(bd['vCard']){
+						if(bd['vCard'].name){
+							if ((bd['vCard'].name as VCardName).given)info += (bd['vCard'].name as VCardName).given+ " ";
+							if ((bd['vCard'].name as VCardName).middle)info += (bd['vCard'].name as VCardName).middle+ " ";
+							if ((bd['vCard'].name as VCardName).family)info += (bd['vCard'].name as VCardName).family;
+							
+						}else {
+							if (bd['vCard'].nickname != null && bd['vCard'].nickname.length > 0){
+								info += bd['vCard'].nickname;
+							}
+						}
+						if (info.length>0)info+="\n";
+						if(bd['vCard'].email)info +="E-mail: "+bd['vCard'].email+"\n\n";
+						if(bd['phones']){
+							for (var ph:String in bd['phones']){
+								info += bd['phones'][ph].label+": "+ bd['phones'][ph].phone+"\n"
+							}
+						}
+					}
+					if (bd.hasOwnProperty("roster")){
+						var s:String = bd['roster'].status;
+						var show:ShowLed = new ShowLed();
+						show.showLed = ShowStatusManager.getShowIco( bd['roster'] );
+						show._top = -3;
+						var sts:Label = new Label();
+						sts.styleName = "_contactItemStatus";
+						
+						sts.maxWidth = ptt.maxWidth - 37;
+						sts.text = s;
+						
+						ptt._bottomCont.addElement(show)
+						ptt._bottomCont.addElement(sts);
+						ptt.bodyText = info;
+					}
+					
+					
+					ptt.bodyText = info;
+					
+					ptt.init();
+					
+					ptt.move(
+						FlexGlobals.topLevelApplication.nativeWindow.x + event.mouseEvent.stageX, //+ 30,
+						FlexGlobals.topLevelApplication.nativeWindow.y + event.mouseEvent.stageY //+ 30
+					);
+					
+					ptt.activate();
+				}catch (error:Error){
+					
+				}
+					
+			}
+			
+	
+		]]>
+	</fx:Script>
+
+	<s:List		id="_contactList"
+				name="contactItem"
+				height="{_contactList.dataGroup.contentHeight}"
+				
+				top="0" width="100%" 
+				styleName="_contactsList"
+				contentBackgroundAlpha="0"
+				
+				dataProvider="{manager.displayItems}"  
+				
+				borderVisible="false" 
+				
+				labelFunction="labelFunction"
+				allowMultipleSelection="true"
+				
+				verticalScrollPolicy="off"
+				horizontalScrollPolicy="off"
+				
+				skinClass="net.gltd.gtms.view.utils.NoScrollListSkin"
+				
+				doubleClickEnabled="true" 
+				pageScrollingEnabled="false"
+				useVirtualLayout="true"
+				dragEnabled="true"
+				
+				
+			>
+	</s:List>
+
+	
+
+
+	</s:Group>
+

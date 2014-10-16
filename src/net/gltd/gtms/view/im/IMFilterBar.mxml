@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:ns="http://www.spicefactory.org/parsley/pimento"
+		 xmlns:parsley="http://www.spicefactory.org/parsley"
+		 width="100%" height="55"
+		 creationComplete="init()">
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			import mx.collections.ArrayCollection;
+
+			private function init():void{
+				_showList.dataProvider = new ArrayCollection(["All Contacts","IM Contacts","Directory"]);
+				_showList.selectedIndex = 0;
+			}
+			private function change():void {
+			
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:Label y="1" left="4" text="Show" styleName="_showTitle" />
+	<s:DropDownList id="_showList" x="0" width="134" color="#FFFFFF" fontSize="10" itemRenderer="net.gltd.gtms.view.DropDownItemRenderer"
+					skinClass="com.gtms.skins.utils.MainDropDownListShow" verticalCenter="0" change="change()" />
+	
+	<!--s:ToggleButton right="0" buttonMode="true" visible="false"
+			  icon="@Embed('assets/skins/main_tabs_ico/main_add_roster_contact.png')"
+			  styleName="mainMenu" verticalCenter="0" toolTip="Add New Roster Contact" click="IMmanager.addRoster(event)"/-->
+</s:Group>

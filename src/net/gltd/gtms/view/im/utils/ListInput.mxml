@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" xmlns:utils="net.gltd.gtms.view.im.utils.*" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.events.UserEvent;
+			import net.gltd.gtms.utils.FilterArrayCollection;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+		
+			
+			private var _text:String;
+			
+			[Bindable]
+			public var dp:FilterArrayCollection = new FilterArrayCollection([]);
+			
+			[Bindable]
+			public 	var editable:Boolean = true;
+			
+			protected function textinput1_textInputHandler(event:TextEvent):void
+			{ 
+				
+				_input.widthInChars = Math.max(5,_input.text.length*.75);
+				_scroll.horizontalScrollBar.value = _scroll.horizontalScrollBar.maximum + 6
+				
+				if (event.text == "," && _input.text!=",") {
+				
+					var to:int =  _input.text.length;
+					var i:int = 1;
+					do {
+						if ( _input.text.charAt(_input.text.length-i) != " ")
+						{
+							to = _input.text.length-i+1;
+							break;
+						}
+						if (_input.text.length-i<1)break;
+						i++;
+							
+					}while(1)
+					dp.addItem( {id:_input.text.slice(0,to),label:_input.text.slice(0,to)} );
+					
+				}else {
+					//_input.width = _input.explicitWidth;
+					return
+				}
+				_input.text = "";
+				//_input.width = 16;
+				dp.refresh();
+				
+				
+				_input.widthInChars = Math.max(5,_input.text.length*.75);
+				_scroll.horizontalScrollBar.value = _scroll.horizontalScrollBar.maximum + 6
+			}
+			
+			protected function _items_creationCompleteHandler(event:FlexEvent):void
+			{
+				_items.addEventListener("removeItem",onRemoveItem);
+			}
+			private function onRemoveItem(event:UserEvent):void {
+				dp.removeItemAt( dp.getItemIndex( event.data ) );
+				dp.refresh()
+			}
+			
+			public function set text(s:String):void {
+				var all:Array = s.split(",");
+				for (var i:uint = 0; i<all.length;i++){
+					dp.addItem( {id: all[i], label: all[i]} );
+				}
+				dp.refresh();
+				_text = s;
+			}
+			
+			public function get text():String {
+				var t:String = "";
+				try {
+					if (_input.text.length>0){
+						dp.addItem({id:_input.text,label:_input.text});
+						_input.text = "";
+					}
+				}catch (er:Error){
+				
+				}
+				for (var i:uint = 0; i<dp.length;i++){
+					t += dp.getItemAt(i).id;
+					if (i<dp.length-1)t+=",";
+				}
+				
+				return t;
+			}
+			
+			public function addItem(value:String,nickname:String):void {
+				dp.addItem({id:value,label:nickname});
+			}
+		]]>
+	</fx:Script>
+	<s:TextInput id="_displayBg" editable="false" top="0" left="0" right="0" selectable="false"/>
+	<s:Scroller id="_scroll" verticalScrollPolicy="off" horizontalScrollPolicy="auto" left="0" right="0" top="0">
+		<s:Group left="0" right="0" id="_gt" height="{_displayBg.height}">
+			<s:DataGroup dataProvider="{dp}" left="3" right="17" top="3" id="_items" creationComplete="_items_creationCompleteHandler(event)" >
+				<s:layout>
+					<s:HorizontalLayout gap="2" />
+				</s:layout>
+				<s:itemRenderer>
+					<fx:Component>
+						<utils:TextInputItemRenderer/>
+					</fx:Component>
+				</s:itemRenderer>
+			</s:DataGroup>	
+			<s:TextInput id="_input" editable="{editable}" widthInChars="5" contentBackgroundAlpha="0" borderVisible="false" text="" verticalCenter="0" skinClass="spark.skins.spark.TextInputSkin" left="{_items.contentWidth + 3}" focusAlpha="0" textInput="textinput1_textInputHandler(event)" />		
+		</s:Group>
+	</s:Scroller>
+	
+</s:Group>

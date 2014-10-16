@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+** InviteList.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 20, 2012 
+* 
+*
+--> 
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%"
+		 xmlns:parsley="http://www.spicefactory.org/parsley"  
+		 creationComplete="cc(event)" xmlns:utils="net.gltd.gtms.utils.*" 
+		 >
+	<fx:Declarations>
+		<parsley:Configure/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import net.gltd.gtms.controller.xmpp.Connection;
+			import net.gltd.gtms.model.contact.BuddyModel;
+			import net.gltd.gtms.model.contact.IMBuddyModel;
+			import net.gltd.gtms.model.contact.singl.buddiesHolder;
+
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.core.XMPPConnection;
+			import org.igniterealtime.xiff.events.PresenceEvent;
+			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
+		
+			[Bindable]
+			private var contacts:ArrayCollection;
+			private var conn:XMPPConnection;
+			
+
+			private	var	me:String;
+			public	var	occupants:Array = [];
+			public 	var selectedIds:Array = [];
+			public	var room:Room;
+
+			public function init():void {
+				contacts = new ArrayCollection();
+				
+				if (conn!=null)return;
+				try {
+					conn = XMPPConnection.openConnections[0] as XMPPConnection;
+					conn.addEventListener(PresenceEvent.PRESENCE,onPresence);
+					me = conn.jid.bareJID;
+				}catch (error:Error){
+					trace (error.getStackTrace());
+				}
+				
+				
+				var bh:buddiesHolder = buddiesHolder.getInstance();
+				var selected:Vector.<Object> = new Vector.<Object>();
+				var j:uint;
+				var meDomain:String;
+				try {
+					meDomain = conn.jid.domain;
+				}catch (er:Error) {
+					
+				}
+				for (var i:uint = 0; i<bh.length;i++){
+					if (bh.getBuddy(i).kind == IMBuddyModel.BUDDY_KIND){
+						var bd:IMBuddyModel = bh.getBuddy(i) as IMBuddyModel;
+						if (bd.id == me)continue;
+						if (bd.roster.jid.domain != meDomain)continue;
+						var b:Boolean = false;
+						for (j = 0; j < occupants.length; j++){
+							if (bd.id == occupants[j]){
+								b = true;
+								continue;
+							}
+						}
+						if (b) continue;
+						
+						contacts.addItem({
+							nickname	:bd.nickname,
+							roster		:bd.roster,
+							jid			:bd.roster.jid
+						})
+						for (j = 0; j < selectedIds.length; j++){
+							if (bd.id == selectedIds[j])selected.push( contacts.getItemAt(contacts.length-1) );
+						}
+						//if (selectedId == bd.id)_list.selectedItem = contacts.getItemAt(contacts.length-1);
+					}
+				}
+				
+				var df:SortField = new SortField();
+				df.name = "nickname";
+				var sort:Sort = new Sort();
+				sort.fields = [df];
+				contacts.sort = sort;
+				contacts.filterFunction = getOnline;
+				contacts.refresh();
+				 
+				_list.selectedItems = selected;
+				
+			}
+			private function onPresence(event:PresenceEvent):void {
+				contacts.refresh()
+			}
+			private function getOnline(obj:Object):Boolean {
+				return obj.roster.online;
+			}
+			
+			public function onRemove():void
+			{
+				try {
+					this.removeAllElements();
+					conn.removeEventListener(PresenceEvent.PRESENCE,onPresence);
+					contacts.removeAll();
+					contacts = null;
+				}catch (error:Error){
+					
+				}
+			}
+			
+			protected function cc(event:FlexEvent):void
+			{
+				_roomName.enabled = room==null;
+				if (room!=null)_roomName.text = room.roomName;
+			}
+			
+			
+			
+			protected function _roomName_focusInHandler(event:FocusEvent):void
+			{
+				// TODO Auto-generated method stub
+				fi.visible = false;
+			}
+			
+			protected function _roomName_focusOutHandler(event:FocusEvent):void
+			{
+				if (_roomName.text.length==0)fi.visible = true;
+			}
+			
+			
+			protected function _roomName_focusInHandler2(event:FocusEvent):void
+			{
+				// TODO Auto-generated method stub
+				im.visible = false;
+			}
+			
+			protected function _roomName_focusOutHandler2(event:FocusEvent):void
+			{
+				if (_inviteMessage.text.length==0)im.visible = true;
+			}
+			
+		]]>
+	</fx:Script>
+	
+		 
+	<s:TextInput id="_roomName" top="2" left="3" right="3" text="" focusIn="_roomName_focusInHandler(event)" focusOut="_roomName_focusOutHandler(event)"
+				 restrict="a-zA-Z0-9_ "
+				 />
+	<s:Label id="fi" visible="{_roomName.text.length==0}" left="10"  top="10" enabled="false" color="#6a6a6a" fontSize="11" fontStyle="italic" mouseChildren="false" mouseEnabled="false"
+			 text="Room Name"/>
+	
+	
+	<s:TextInput id="_inviteMessage" top="30" left="3" right="3" text="" focusIn="_roomName_focusInHandler2(event)" focusOut="_roomName_focusOutHandler2(event)"
+				 restrict="a-zA-Z0-9_ "
+				 />
+	<s:Label id="im" visible="{_inviteMessage.text.length==0}" left="10"  top="38" enabled="false" color="#6a6a6a" fontSize="11" fontStyle="italic" mouseChildren="false" mouseEnabled="false"
+			 text="Invite Message"/>
+	
+	
+	<utils:CheckList id="_list" 
+					 top="58"
+					 borderVisible="false"
+					 contentBackgroundAlpha="0"
+					 width="100%" height="100%"
+					 itemRenderer="net.gltd.gtms.view.utils.InviteListItem"
+					 dataProvider="{contacts}">
+	 
+		
+		<utils:layout>
+			<s:VerticalLayout paddingTop="3" paddingBottom="3" paddingLeft="3" paddingRight="3" gap="1" />
+		</utils:layout>
+		
+	</utils:CheckList>
+	
+</s:Group>

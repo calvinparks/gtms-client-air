@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  
+** Mainp.mxml **  
+*
+*	 Globility Limited
+* 
+*	 Copyright 2012. All rights reserved. 
+* 
+*	 Author: Piotr Kownacki ( pinczo@pinczo.net )
+*	 pinczo 
+*	 communified_v3.2 
+*	 Created: Jun 11, 2012 
+* 
+* 
+-->
+
+<s:WindowedApplication	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  	xmlns:s="library://ns.adobe.com/flex/spark" 
+					  	xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:parsley="http://www.spicefactory.org/parsley"  
+					  	showStatusBar="false" 
+						visible="true"
+						alpha="{Number(_visible)}"
+						initialize="onInitial(event)"
+						creationComplete="init(event)" moving="windowedapplication1_movingHandler(event)"
+						close="onClose(event)" xmlns:app="net.gltd.gtms.view.app.*"  >
+<fx:Style>
+	@namespace s "library://ns.adobe.com/flex/spark";
+	@namespace mx "library://ns.adobe.com/flex/mx";
+	@namespace parsley "http://www.spicefactory.org/parsley";
+	@namespace app "net.gltd.gtms.view.app.*";
+	 
+	@font-face {
+		src:url("../assets/DS-DIGI.ttf");
+		fontFamily: digi;
+		embed-as-cff: true;
+	}
+	
+</fx:Style>
+	<fx:Declarations>
+		<mx:ProgressBar	/>
+		<mx:DateField />
+		<parsley:ContextBuilder config="{MainParsleyBeans}" id="_parslaey" />
+		<parsley:Configure	/>
+		
+		<s:Power id="powerEasing" easeInFraction=".4" />
+		<s:Parallel id="showEff" duration="320"  >
+			<s:Fade alphaFrom="0.0" alphaTo="1.0" easer="{powerEasing}" />
+			<s:Move xFrom="-300" xTo="0" easer="{powerEasing}" />
+		</s:Parallel>
+		
+		<s:Parallel id="hideEff" duration="320"  >
+			<s:Fade alphaFrom="1" alphaTo="0" easer="{powerEasing}" />
+			<s:Move xFrom="0" xTo="-500" easer="{powerEasing}"/>
+		</s:Parallel>
+		
+	</fx:Declarations>
+	<fx:Script> 
+		<![CDATA[
+			import adobe.utils.ProductManager;
+			
+			import beans.MainParsleyBeans;
+			
+			import net.gltd.gtms.GUI.UEM.UEMQueue;
+			import net.gltd.gtms.GUI.window.CustomWindow;
+			import net.gltd.gtms.controller.app.ApplicationManager;
+			import net.gltd.gtms.controller.app.SettingsManager;
+			import net.gltd.gtms.model.im.AvatarModel;
+			import net.gltd.gtms.model.rules.RuleStystemModel;
+			import net.gltd.gtms.model.rules.singl.rulesHolder;
+			import net.gltd.gtms.utils.StyleModuleMarshaller;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.events.ModuleEvent;
+			import mx.events.StyleEvent;
+			import mx.logging.Log;
+			import mx.logging.LogEventLevel;
+			
+			import org.igniterealtime.xiff.conference.Room;
+			import org.igniterealtime.xiff.data.Message;
+			
+			import spark.components.WindowedApplication;
+			
+				
+			[Bindable][Inject ( id="applicationManager" ) ]
+			public var appManager:ApplicationManager;
+			
+			[Bindable]
+			private var _visible:Boolean = false;
+			[Bindable]
+			private var logo:Class;
+			[Bindable] 
+			public var moveable:Boolean = true;
+			
+			public static var currentTheme:String;
+			public static var defaultTheme:String;
+			public static var defaultThemeFileName:String =  "CommunifiedSkin.swf";// "GlobilitySkin.swf";
+			public static var LoadTheme:Function;
+			public static var THIS:Main;
+			
+			private 		var		_tryCounter			:uint = 0,
+									_themeTO			:uint,
+									_loadingTheme		:String,
+									_ruleModel			:RuleStystemModel;
+			
+			protected 		var 	moveTimer			:uint;
+									
+			
+			public	static	var 	RULE				:Object = {name:"IM",value:"im"};		
+		
+			
+			private			var		logTarget			:TraceWritter;	
+			
+			private function initLogging():void {
+		
+				logTarget = new TraceWritter();
+	
+				logTarget.filters=["*"];
+				
+				logTarget.level = LogEventLevel.ALL;
+		
+				logTarget.includeTime = true;
+				logTarget.includeCategory = true;
+				logTarget.includeLevel = true;
+				
+				Log.addTarget(logTarget);
+				
+				
+			}
+			
+			protected function onInitial(event:FlexEvent):void
+			{ 	
+				
+				try {
+
+			
+					var p:Point = SettingsManager.getWindowPosition("main_app_window");
+					if (p !=null){
+						
+						var	x:int = Math.min(p.x, Screen.mainScreen.bounds.width-this.width);
+						var y:int = Math.min(p.y, Screen.mainScreen.bounds.height-this.height); 
+						this.move(x,y);	
+					}
+					
+					defaultTheme = defaultThemeFileName;
+				
+					try {
+						var themeFile:File = File.applicationDirectory.resolvePath(defaultThemeFileName);
+						if (!themeFile.exists){
+							MLog.Log("Can not find "+defaultThemeFileName+ " theme file!");
+						}else {
+							defaultTheme = themeFile.url;
+						}
+					}catch (errorPath:Error){
+						MLog.Log("defaultTheme: "+defaultTheme);	
+					}
+					MLog.Log("Can not find "+defaultThemeFileName+ " theme file!");
+					try {
+						loadTheme();
+					}catch (error:Error){
+						MLog.Log("loading theme: "+error.getStackTrace(),"ERROR");
+					}
+					THIS = this; 
+				}catch (mainError:Error){
+					trace("* onInitial"+mainError.getStackTrace());
+				}
+			}
+			protected function init(event:FlexEvent):void
+			{
+	
+				try {
+					new UEMQueue();  
+					LoadTheme = loadTheme;
+				}catch (error1:Error){
+					trace(error1.getStackTrace());
+				}
+				
+				try {
+					_ruleModel = rulesHolder.getInstance().addRule(RULE.name,RULE.value);
+					rulesHolder.getInstance().addSubsystemToRule(_ruleModel.id,"All","*");
+					_ruleModel.triggerEvent = new ArrayCollection([{label:"New Message", value:Message.TYPE_CHAT}]);
+					var tmpDP:ArrayCollection = new ArrayCollection();
+					var m:Object = {body:"",subject:"",thread:"",from:"",htmlBody:"",id:"",state:"",to:"",time:"",type:"",xml:""};
+					
+					for (var ind:String in m){
+						tmpDP.addItem({label:ind,value:ind});
+					}
+					_ruleModel.parameterType.getItemByID("eventVariable").dataProvider = tmpDP;
+				}catch (error:Error){
+					trace(error.toString());
+				}
+				
+			} 
+			private function loadDefault( ):void {
+				try { 
+					var myEvent:IEventDispatcher = 
+						styleManager.loadStyleDeclarations(defaultTheme,true,true,ApplicationDomain.currentDomain, SecurityDomain.currentDomain);
+					myEvent.addEventListener(StyleEvent.COMPLETE, styleLoaded);
+				}catch (error:Error){
+					trace(error.toString());
+				}
+			}
+			private function styleLoaded(event:StyleEvent):void {
+				try {
+					setTimeout(makeItVisible,400);
+					setTimeout(getImages,1000);
+					currentTheme = defaultTheme;
+				}catch (error:Error){
+					trace(error.getStackTrace());
+				}
+			
+			}
+
+			private function onSkinReady(event:ModuleEvent):void {
+				clearTimeout(_themeTO);
+				try {
+					styleManager.unloadStyleDeclarations(currentTheme,false);
+				}catch (error:Error){
+					trace(error.toString());
+				}
+				try {
+					currentTheme = _loadingTheme;
+				 	event.currentTarget.updateStyle();
+					setTimeout(makeItVisible,500);
+					setTimeout(getImages,200);
+				}catch (error:Error){
+					trace(error.toString());
+				}
+			 
+			}
+			private function getImages():void {
+				try {
+					AvatarModel.pathLarge = styleManager.getMergedStyleDeclaration('.avatarIco').getStyle('icon');
+					AvatarModel.pathSmall = styleManager.getMergedStyleDeclaration('.avatarListIco').getStyle('icon');
+					logo = styleManager.getMergedStyleDeclaration('.logoSrc').getStyle('icon');
+					AvatarModel.pathGroup =  styleManager.getMergedStyleDeclaration('.avatarRoomIco').getStyle('icon');	
+					AvatarModel.pathWG =  styleManager.getMergedStyleDeclaration('.avatarWGIco').getStyle('icon');
+					
+				}catch (error:Error){
+					trace (error.getStackTrace());
+					 
+				}
+		
+			}
+			private function onSkinError(event:ModuleEvent):void {
+				clearTimeout(_themeTO);
+			}
+			
+			public function doUpdate(event:StyleEvent):void {
+				this.visible = true;
+				this.orderToFront();
+			}
+			
+			private function loadTheme():void {
+				try {
+					var bytes:ByteArray = EncryptedLocalStore.getItem("currentThemeURL5");
+					var tf:File;
+					if (bytes != null)  tf = new File(bytes.readUTFBytes(bytes.length));
+					if (bytes == null || bytes.toString() == defaultTheme || tf == null || tf.exists == false){
+						loadDefault();
+						return
+					}
+				}catch (error1:Error){
+					trace(error1.getStackTrace());
+				}
+				var theme:String;
+				var mm:StyleModuleMarshaller;
+				
+				try {
+					theme = tf.url;
+					mm = new StyleModuleMarshaller(theme,true);
+					mm.addEventListener(ModuleEvent.READY,onSkinReady);
+					mm.addEventListener(ModuleEvent.ERROR,onSkinError);
+					mm.loadModule();
+					_loadingTheme = theme;
+					_themeTO = setTimeout(loadAgain,1400);
+				}catch (error:Error){
+					loadDefault();
+					trace(error.getStackTrace());
+				}
+				
+			}
+			private function loadAgain():void {
+				if (++_tryCounter > 4)reboot(100);
+				loadTheme();
+			}
+
+		
+			private function makeItVisible():void { 
+				_visible = true;
+				 if (appManager!=null)appManager.runFirstModule();
+			}
+		 
+			public function reboot(delay:Number=3300):void {	
+				var app:WindowedApplication = WindowedApplication(FlexGlobals.topLevelApplication);
+			
+				for (var i:uint = 0; i < this.nativeApplication.openedWindows.length;i++){
+					if (this.nativeApplication.openedWindows[i] != app.nativeWindow){
+						this.nativeApplication.openedWindows[i].close();
+					}
+				}
+				setTimeout(function ():void {
+						app.exit();
+						var mgr:ProductManager = new ProductManager("airappinstaller");
+						mgr.launch("-launch "+app.nativeApplication.applicationID+" "+app.nativeApplication.publisherID);
+						
+					},delay)
+			}
+			
+			protected function onClose(event:Event):void
+			{
+				this.exit();
+				try {
+					logTarget.closeFile();
+				}catch(error:Error){ 
+				}
+			}
+
+			protected function windowedapplication1_movingHandler(event:NativeWindowBoundsEvent):void
+			{
+				clearTimeout( moveTimer );
+				moveTimer = setTimeout(savePosition,300);
+				
+			}
+			
+			protected function window1_activateHandler(event:Event):void
+			{
+				
+			}
+			
+			private function savePosition():void {
+				if (this.id != null && this.name != null){
+					SettingsManager.setWindowPosition("main_app_window" , new Point(this.nativeWindow.x,this.nativeWindow.y) );
+				}
+				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group  visible="false" id="_inv"/>
+	<app:TopBar	id="_topAppControls"
+				width="100%" visible="{_visible}"
+				windowManager="{appManager.windowManager}"  maximizable="{this.maximizable}" minimizable="{this.minimizable}" moveable="{this.moveable}"
+				imgSource="{logo}" />
+	<s:Group id="_mainContainer" top="55" left="10" right="10" bottom="55" visible="{_visible}"/>
+	
+</s:WindowedApplication>

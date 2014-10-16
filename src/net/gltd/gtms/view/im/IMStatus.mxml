@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  width="100%" height="60" maxHeight="60"
+					  styleName="statusMenuSkin"
+					  xmlns:parsley="http://www.spicefactory.org/parsley"
+					  xmlns:im="net.gltd.gtms.view.im.*"
+					  creationComplete="init(event)" xmlns:utils="net.gltd.gtms.view.im.utils.*"
+						>
+	<fx:Declarations>
+		<parsley:Configure />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			//  skinClass="com.gtms.skins.utils.StatusMenuSkin"
+			
+			
+			import net.gltd.gtms.controller.im.ShowStatusManager;
+			import net.gltd.gtms.controller.xmpp.PresenceManager;
+			import net.gltd.gtms.model.im.ShowStatusModel;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			[Inject][Bindable]
+			public var showManager:ShowStatusManager;
+			[Inject][Bindable]
+			public var presenceManager:PresenceManager;
+			
+			
+			[Bindable]
+			private var _showCollection:ArrayCollection = new ArrayCollection();
+			
+			
+			private	var _lastMsg:String;
+			private var _show:String;
+			
+			protected function init(event:FlexEvent):void
+			{
+				var _i:uint = 0;
+				var _selected:int = 1
+				for (var i:uint = 0; i< showManager.showCollection.length;i++){
+					if (showManager.showCollection[i].displayOnList == false)continue;
+					if (showManager.showCollection[i].show == presenceManager.show)
+					{
+						_selected = _i;
+					}
+					_showCollection.addItem(showManager.showCollection[i])
+					_i++;
+				}
+				
+				_showCollection.refresh();
+				_showList.selectedIndex = _selected; 
+				
+				_showTextDisplay.text = _showList.selectedItem.statusMsg;
+				_avatar.toolTip = presenceManager.conn.myProfile.bareJID
+				//_avatar.ico.source = presenceManager.conn.myProfile.avatar.bmpData;
+				//presenceManager.conn.myProfile.avatar.addEventListener(Event.COMPLETE,onAvatarCompl)
+			}
+			//private function onAvatarCompl(event:Event):void {
+		//		_avatar.ico.source = presenceManager.conn.myProfile.avatar.bmpData;
+		//	}
+			public function setDOstatus(m:ShowStatusModel):void {
+				for (var i:uint = 0; i < _showCollection.length;i++){
+					if (_showCollection.getItemAt(i).show == m.show){
+						_showList.selectedItem = _showCollection.getItemAt(i);
+						break;
+					}
+				} 
+				if ( m.statusMsg != null){
+					_showTextDisplay.text = m.statusMsg;
+				}else {
+					_showTextDisplay.text = ShowStatusManager.getShow("available").statusMsg
+				}
+				
+				
+			}
+			protected function onStatusChange(event:IndexChangeEvent):void
+			{
+				_show = (_showList.selectedItem as ShowStatusModel).show;
+				sendPresence()
+			}
+			private function sendPresence(statusMsg:String=""):void {
+				if (statusMsg == null || statusMsg.length == 0){
+					statusMsg = (_showList.selectedItem as ShowStatusModel).statusMsg;
+				}else {
+					_lastMsg = statusMsg;
+				}
+				presenceManager.sendPresence(_show, statusMsg);
+				_showTextDisplay.text = statusMsg;
+				_showTextDisplay.visible = true;
+				
+				
+				_statusDisplay.text = "";
+				_showTextDisplay.setFocus();
+				
+			}
+			protected function onStatusEnter(event:FlexEvent):void
+			{
+				sendPresence(event.currentTarget.text);
+			}
+			
+			protected function onStatusFocusOut(event:FocusEvent):void
+			{
+				if (event.currentTarget.text != null && event.currentTarget.text.length > 0){
+					sendPresence(event.currentTarget.text)
+				}
+			}
+			
+			protected function onStatusFocusIn(event:FocusEvent):void
+			{
+				_showTextDisplay.visible = false;
+				_statusDisplay.text = "";
+				if (_lastMsg!=null)_statusDisplay.appendText(_lastMsg);
+					
+			}
+			
+		]]>
+	</fx:Script>
+	<s:layout>
+		<s:VerticalLayout verticalAlign="middle" horizontalAlign="center" />
+	</s:layout>
+
+
+	<s:HGroup gap="10" width="100%" paddingLeft="10" paddingRight="10" verticalAlign="middle">
+		<im:IMAvatar  id="_avatar" source="{presenceManager.conn.myProfile.avatar.foto}"  />
+		<s:Group  width="100%" left="2" right="2" >
+	
+			<s:ComboBox id="_showList" width="100%"
+						arrowKeysWrapFocus="false" enabled="true"
+						focusEnabled="false"  prompt="offline"
+						horizontalScrollPolicy="off"
+						dataProvider="{_showCollection}"
+						itemRenderer="net.gltd.gtms.view.im.utils.MyStatusItemRenderer" 
+						styleName="_showListStyle" change="onStatusChange(event)">
+	
+			</s:ComboBox>
+			<utils:ShowLed id="ledDisplay" verticalCenter="0" left="3" top="2" showLed="{_showList.selectedItem.ico}"  />
+			
+			<s:RichEditableText id="_showTextDisplay"
+								styleName="_myStatusText"
+								left="22" right="26" height="16" color="0x000000"
+								editable="false" focusEnabled="false" 
+								multiline="false" verticalAlign="middle"
+								verticalCenter="1" widthInChars="10"/>
+		
+			<s:RichEditableText id="_statusDisplay" left="22" right="26" height="16" color="0x249e23"
+								styleName="_myStatusText"
+								focusEnabled="false"
+								enter="onStatusEnter(event)"
+								focusOut="onStatusFocusOut(event)"
+								focusIn="onStatusFocusIn(event)"
+								multiline="false" verticalAlign="middle"
+								verticalCenter="1" widthInChars="10"/>
+		
+		
+		</s:Group>
+	</s:HGroup>
+	
+	
+	
+</s:SkinnableContainer>
