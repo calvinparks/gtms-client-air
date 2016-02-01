@@ -95,7 +95,8 @@
 			private var logo:Class;
 			[Bindable] 
 			public var moveable:Boolean = true;
-			
+
+			public static var test:String;
 			public static var currentTheme:String;
 			public static var defaultTheme:String;
 			public static var defaultThemeFileName:String =  "CommunifiedSkin.swf";// "GlobilitySkin.swf";
